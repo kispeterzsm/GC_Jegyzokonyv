@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Jegyzőkönyv</string>
+
+    <string name="home_title">Jegyzőkönyvek</string>
+    <string name="home_empty">Még nincs egyetlen jegyzőkönyv sem.\nÉrintsd meg a + gombot az új jegyzőkönyv indításához.</string>
+    <string name="home_new_draft">Új jegyzőkönyv</string>
+
+    <string name="templates_title">Sablon választása</string>
+    <string name="templates_empty">Nem található sablon.</string>
+
+    <string name="dialog_new_draft_title">Új jegyzőkönyv</string>
+    <string name="dialog_new_draft_hint">Cím</string>
+    <string name="dialog_confirm_delete_title">Törlés megerősítése</string>
+    <string name="dialog_confirm_delete_message">Biztosan törlöd ezt a jegyzőkönyvet? A művelet nem visszavonható.</string>
+
+    <string name="action_create">Létrehozás</string>
+    <string name="action_cancel">Mégse</string>
+    <string name="action_save">Mentés</string>
+    <string name="action_delete">Törlés</string>
+    <string name="action_share">Megosztás</string>
+    <string name="action_back">Vissza</string>
+    <string name="action_more">További</string>
+
+    <string name="editor_add_photo">Fotó hozzáadása</string>
+    <string name="editor_add_text">Szöveg hozzáadása</string>
+    <string name="editor_export_pdf">Exportálás PDF-be</string>
+    <string name="editor_share_pdf">PDF megosztása</string>
+    <string name="editor_title_hint">Cím</string>
+    <string name="editor_export_in_progress">PDF készítése folyamatban…</string>
+    <string name="editor_export_success">PDF elkészült.</string>
+    <string name="editor_export_failed">A PDF exportálása nem sikerült.</string>
+    <string name="editor_no_pdf_yet">Először exportáld a jegyzőkönyvet PDF-be.</string>
+
+    <string name="dialog_add_text_title">Szöveg hozzáadása</string>
+    <string name="dialog_add_text_hint">Szöveg</string>
+    <string name="dialog_caption_title">Képaláírás</string>
+    <string name="dialog_caption_hint">Képaláírás (nem kötelező)</string>
+    <string name="dialog_caption_skip">Kihagyás</string>
+
+    <string name="camera_permission_required">A fotó készítéséhez kamera-engedély szükséges.</string>
+    <string name="camera_permission_grant">Engedély megadása</string>
+    <string name="camera_capture">Felvétel</string>
+
+    <string name="share_chooser_title">Megosztás</string>
+
+    <string name="default_draft_title_prefix">Jegyzőkönyv</string>
+
+    <string name="template_inspection_name">Helyszíni szemle</string>
+</resources>
