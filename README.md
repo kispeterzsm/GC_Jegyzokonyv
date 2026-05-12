@@ -10,13 +10,13 @@ See [`PLAN.md`](./PLAN.md) for the full product vision.
 
 ## APK Download
 
-Latest local debug build:
-[`app-debug.apk`](./app/build/outputs/apk/debug/app-debug.apk)
+Latest debug APK:
+[`app-debug.apk`](https://github.com/kispeterzsm/GC_Jegyzokonyv/releases/download/v0.1.0-debug/app-debug.apk)
 
 Install it on a connected Android device with:
 
 ```sh
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r app-debug.apk
 ```
 
 ## Building
