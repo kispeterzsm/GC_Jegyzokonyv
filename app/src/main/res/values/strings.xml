@@ -8,9 +8,30 @@
 
     <string name="templates_title">Sablon választása</string>
     <string name="templates_empty">Nem található sablon.</string>
+    <string name="templates_new_template">Új sablon</string>
+    <string name="templates_built_in_badge">Beépített</string>
 
-    <string name="dialog_new_draft_title">Új jegyzőkönyv</string>
-    <string name="dialog_new_draft_hint">Cím</string>
+    <string name="template_editor_new_title">Új sablon</string>
+    <string name="template_editor_edit_title">Sablon szerkesztése</string>
+    <string name="template_editor_name_hint">Sablon neve</string>
+    <string name="template_editor_title_hint">Dokumentum címe</string>
+    <string name="template_editor_title_helper">Ez lesz a jegyzőkönyv címe és az exportált PDF fájl neve.</string>
+    <string name="template_editor_text_block_label">Szöveg</string>
+    <string name="template_editor_date_block_label">Dátum (a használatkor a mai dátum kerül be)</string>
+    <string name="template_editor_add_text_block">+ Szöveg</string>
+    <string name="template_editor_add_date_block">+ Dátum</string>
+    <string name="template_editor_block_delete">Törlés</string>
+    <string name="template_editor_block_move_up">Mozgatás felfelé</string>
+    <string name="template_editor_block_move_down">Mozgatás lefelé</string>
+    <string name="template_editor_fallback_name">Névtelen sablon</string>
+
+    <string name="template_action_duplicate">Duplikálás</string>
+    <string name="template_action_edit">Szerkesztés</string>
+    <string name="template_action_delete">Törlés</string>
+    <string name="template_action_delete_title">Sablon törlése</string>
+    <string name="template_action_delete_message">Biztosan törlöd ezt a sablont? A művelet nem visszavonható.</string>
+    <string name="template_default_copy_suffix">(másolat)</string>
+
     <string name="dialog_confirm_delete_title">Törlés megerősítése</string>
     <string name="dialog_confirm_delete_message">Biztosan törlöd ezt a jegyzőkönyvet? A művelet nem visszavonható.</string>
 
@@ -30,6 +51,7 @@
     <string name="editor_export_in_progress">PDF készítése folyamatban…</string>
     <string name="editor_export_success">PDF elkészült.</string>
     <string name="editor_export_failed">A PDF exportálása nem sikerült.</string>
+    <string name="editor_export_failed_reason">A PDF exportálása nem sikerült: %1$s</string>
     <string name="editor_no_pdf_yet">Először exportáld a jegyzőkönyvet PDF-be.</string>
 
     <string name="dialog_add_text_title">Szöveg hozzáadása</string>

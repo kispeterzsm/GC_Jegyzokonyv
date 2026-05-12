@@ -13,7 +13,8 @@ class SeedTemplatesUseCase @Inject constructor(
             TemplateEntity(
                 id = BUILTIN_INSPECTION_ID,
                 name = "Helyszíni szemle",
-                assetPath = "templates/inspection.html",
+                title = "Helyszíni szemle",
+                assetPath = "templates/inspection.json",
                 filePath = null,
                 isBuiltIn = true,
             )

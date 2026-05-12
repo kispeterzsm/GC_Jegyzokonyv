@@ -9,7 +9,7 @@ interface DraftRepository {
     fun observeDraft(draftId: String): Flow<Draft?>
     suspend fun getDraft(draftId: String): Draft?
 
-    suspend fun createDraftFromTemplate(templateId: String, title: String): String
+    suspend fun createDraftFromTemplate(templateId: String): String
 
     suspend fun loadHtml(draftId: String): String
     suspend fun saveHtml(draftId: String, html: String)
@@ -22,5 +22,7 @@ interface DraftRepository {
 
     fun draftDir(draftId: String): File
     fun newImageFile(draftId: String): File
-    fun exportPdfFile(draftId: String): File
+    fun exportPdfTarget(draftId: String, filename: String): File
+    fun latestExportedPdf(draftId: String): File?
+    fun deleteExportedPdfs(draftId: String)
 }

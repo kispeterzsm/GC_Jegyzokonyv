@@ -6,6 +6,6 @@ import javax.inject.Inject
 class CreateDraftFromTemplateUseCase @Inject constructor(
     private val draftRepository: DraftRepository,
 ) {
-    suspend operator fun invoke(templateId: String, title: String): String =
-        draftRepository.createDraftFromTemplate(templateId, title)
+    suspend operator fun invoke(templateId: String): String =
+        draftRepository.createDraftFromTemplate(templateId)
 }

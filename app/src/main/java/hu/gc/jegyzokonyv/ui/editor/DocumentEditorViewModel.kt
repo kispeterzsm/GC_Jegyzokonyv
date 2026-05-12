@@ -1,5 +1,6 @@
 package hu.gc.jegyzokonyv.ui.editor
 
+import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -23,8 +24,7 @@ import javax.inject.Inject
 
 sealed interface EditorEvent {
     data class ExportFinished(val pdf: File) : EditorEvent
-    data object ExportFailed : EditorEvent
-    data object NoPdfAvailable : EditorEvent
+    data class ExportFailed(val reason: String?) : EditorEvent
     data class LaunchShare(val intent: Intent) : EditorEvent
 }
 
@@ -49,6 +49,8 @@ class DocumentEditorViewModel @Inject constructor(
 
     private val _events = Channel<EditorEvent>(Channel.BUFFERED)
     val events = _events.receiveAsFlow()
+
+    private var pendingShareAfterExport: String? = null
 
     init {
         viewModelScope.launch {
@@ -89,24 +91,35 @@ class DocumentEditorViewModel @Inject constructor(
             val result = runCatching { exportPdfUseCase(draftId) }
             _isExporting.value = false
             result
-                .onSuccess { _events.send(EditorEvent.ExportFinished(it)) }
-                .onFailure { _events.send(EditorEvent.ExportFailed) }
+                .onSuccess { pdf ->
+                    _events.send(EditorEvent.ExportFinished(pdf))
+                    val chooserTitle = pendingShareAfterExport
+                    pendingShareAfterExport = null
+                    if (chooserTitle != null) {
+                        _events.send(EditorEvent.LaunchShare(sharePdfUseCase(pdf, chooserTitle)))
+                    }
+                }
+                .onFailure { error ->
+                    Log.e(TAG, "PDF export failed", error)
+                    pendingShareAfterExport = null
+                    val reason = error.localizedMessage?.takeIf { it.isNotBlank() }
+                        ?: error.javaClass.simpleName
+                    _events.send(EditorEvent.ExportFailed(reason))
+                }
         }
     }
 
     fun onShareLastPdf(chooserTitle: String) {
         viewModelScope.launch {
-            val pdf = draftRepository.exportPdfFile(draftId)
-            if (pdf.exists()) {
+            val pdf = draftRepository.latestExportedPdf(draftId)
+            if (pdf != null && pdf.exists()) {
                 _events.send(EditorEvent.LaunchShare(sharePdfUseCase(pdf, chooserTitle)))
             } else {
-                _events.send(EditorEvent.NoPdfAvailable)
+                pendingShareAfterExport = chooserTitle
+                onExportPdf()
             }
         }
     }
-
-    fun shareAfterExport(pdf: File, chooserTitle: String): Intent =
-        sharePdfUseCase(pdf, chooserTitle)
 
     fun onDelete(onDeleted: () -> Unit) {
         viewModelScope.launch {
@@ -116,4 +129,8 @@ class DocumentEditorViewModel @Inject constructor(
     }
 
     fun draftFolder(): File = draftRepository.draftDir(draftId)
+
+    private companion object {
+        const val TAG = "ExportPdf"
+    }
 }

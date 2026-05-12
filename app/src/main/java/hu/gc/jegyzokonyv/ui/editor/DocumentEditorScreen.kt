@@ -75,20 +75,21 @@ fun DocumentEditorScreen(
 
     val exportSuccessMsg = stringResource(R.string.editor_export_success)
     val exportFailMsg = stringResource(R.string.editor_export_failed)
-    val noPdfMsg = stringResource(R.string.editor_no_pdf_yet)
     val chooserTitle = stringResource(R.string.share_chooser_title)
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
-                is EditorEvent.ExportFinished -> {
-                    snackbarHostState.showSnackbar(exportSuccessMsg)
-                    context.startActivity(
-                        viewModel.shareAfterExport(event.pdf, chooserTitle)
-                    )
+                is EditorEvent.ExportFinished -> snackbarHostState.showSnackbar(exportSuccessMsg)
+                is EditorEvent.ExportFailed -> {
+                    val reason = event.reason
+                    val msg = if (!reason.isNullOrBlank()) {
+                        context.getString(R.string.editor_export_failed_reason, reason)
+                    } else {
+                        exportFailMsg
+                    }
+                    snackbarHostState.showSnackbar(msg)
                 }
-                EditorEvent.ExportFailed -> snackbarHostState.showSnackbar(exportFailMsg)
-                EditorEvent.NoPdfAvailable -> snackbarHostState.showSnackbar(noPdfMsg)
                 is EditorEvent.LaunchShare -> context.startActivity(event.intent)
             }
         }

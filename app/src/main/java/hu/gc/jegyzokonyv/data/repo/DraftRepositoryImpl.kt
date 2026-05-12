@@ -14,6 +14,9 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -39,13 +42,15 @@ class DraftRepositoryImpl @Inject constructor(
         draftDao.getById(draftId)?.toDomain()
     }
 
-    override suspend fun createDraftFromTemplate(templateId: String, title: String): String =
+    override suspend fun createDraftFromTemplate(templateId: String): String =
         withContext(io) {
-            val templateHtml = templateRepository.loadHtml(templateId)
+            val content = templateRepository.loadContent(templateId)
                 ?: error("Template not found: $templateId")
             val id = UUID.randomUUID().toString()
             val now = System.currentTimeMillis()
-            val initial = htmlEngine.instantiateTemplate(templateHtml, title)
+            val todayIso = dateFormatter().format(Date(now))
+            val title = buildDraftTitle(content.title, todayIso)
+            val initial = htmlEngine.renderTemplate(content, title, todayIso)
 
             fileStorage.draftDir(id)
             fileStorage.imagesDir(id)
@@ -120,7 +125,12 @@ class DraftRepositoryImpl @Inject constructor(
 
     override fun draftDir(draftId: String): File = fileStorage.draftDir(draftId)
     override fun newImageFile(draftId: String): File = fileStorage.newImageFile(draftId)
-    override fun exportPdfFile(draftId: String): File = fileStorage.exportPdf(draftId)
+    override fun exportPdfTarget(draftId: String, filename: String): File =
+        fileStorage.exportPdf(draftId, filename)
+    override fun latestExportedPdf(draftId: String): File? =
+        fileStorage.latestExportedPdf(draftId)
+    override fun deleteExportedPdfs(draftId: String) =
+        fileStorage.deleteExportedPdfs(draftId)
 
     private fun readHtml(draftId: String): String {
         val file = fileStorage.documentHtml(draftId)
@@ -152,6 +162,13 @@ class DraftRepositoryImpl @Inject constructor(
         fileStorage.metadataJson(draftId).writeText(json.toString(2), Charsets.UTF_8)
     }
 
+    private fun buildDraftTitle(templateTitle: String, todayIso: String): String {
+        val base = templateTitle.trim().ifBlank { DEFAULT_TITLE }
+        return "$base $todayIso"
+    }
+
+    private fun dateFormatter() = SimpleDateFormat(DATE_PATTERN, Locale("hu", "HU"))
+
     private fun DraftEntity.toDomain() = Draft(
         id = id,
         title = title,
@@ -159,4 +176,9 @@ class DraftRepositoryImpl @Inject constructor(
         createdAt = createdAt,
         updatedAt = updatedAt,
     )
+
+    private companion object {
+        const val DATE_PATTERN = "yyyy-MM-dd"
+        const val DEFAULT_TITLE = "Jegyzőkönyv"
+    }
 }

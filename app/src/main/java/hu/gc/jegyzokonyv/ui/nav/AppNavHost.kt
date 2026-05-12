@@ -9,6 +9,7 @@ import androidx.navigation.navArgument
 import hu.gc.jegyzokonyv.ui.editor.CameraCaptureScreen
 import hu.gc.jegyzokonyv.ui.editor.DocumentEditorScreen
 import hu.gc.jegyzokonyv.ui.home.HomeScreen
+import hu.gc.jegyzokonyv.ui.templates.TemplateEditorScreen
 import hu.gc.jegyzokonyv.ui.templates.TemplatePickerScreen
 
 @Composable
@@ -31,6 +32,25 @@ fun AppNavHost() {
                         popUpTo(Routes.HOME)
                     }
                 },
+                onNewTemplate = { navController.navigate(Routes.TEMPLATE_NEW) },
+                onEditTemplate = { id -> navController.navigate(Routes.templateEdit(id)) },
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.TEMPLATE_NEW) {
+            TemplateEditorScreen(
+                onSaved = { navController.popBackStack() },
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(
+            Routes.TEMPLATE_EDIT,
+            arguments = listOf(navArgument(Routes.ARG_TEMPLATE_ID) { type = NavType.StringType }),
+        ) {
+            TemplateEditorScreen(
+                onSaved = { navController.popBackStack() },
                 onBack = { navController.popBackStack() },
             )
         }

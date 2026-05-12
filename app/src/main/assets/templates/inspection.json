@@ -1,0 +1,8 @@
+{
+  "title": "Helyszíni szemle",
+  "version": 1,
+  "blocks": [
+    { "id": "builtin-inspection-text", "type": "text", "text": "Helyszíni szemle jegyzőkönyve" },
+    { "id": "builtin-inspection-date", "type": "date" }
+  ]
+}

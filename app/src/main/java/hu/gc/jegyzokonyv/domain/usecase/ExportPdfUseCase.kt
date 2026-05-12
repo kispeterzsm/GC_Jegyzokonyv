@@ -1,13 +1,8 @@
 package hu.gc.jegyzokonyv.domain.usecase
 
 import android.content.Context
-import android.os.Bundle
-import android.os.CancellationSignal
-import android.os.ParcelFileDescriptor
-import android.print.PageRange
-import android.print.PrintAttributes
-import android.print.PrintDocumentAdapter
-import android.print.PrintDocumentInfo
+import android.graphics.pdf.PdfDocument
+import android.view.View
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -17,6 +12,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.io.File
+import java.io.FileOutputStream
 import javax.inject.Inject
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -31,7 +27,9 @@ class ExportPdfUseCase @Inject constructor(
             ?: error("Draft not found: $draftId")
         val html = draftRepository.loadHtml(draftId)
         val draftDir = draftRepository.draftDir(draftId)
-        val output = draftRepository.exportPdfFile(draftId)
+        val documentName = sanitizeFileName(draft.title.ifBlank { "jegyzokonyv" })
+        val output = draftRepository.exportPdfTarget(draftId, "$documentName.pdf")
+        draftRepository.deleteExportedPdfs(draftId)
 
         return withTimeout(PDF_TIMEOUT_MS) {
             withContext(Dispatchers.Main) {
@@ -39,7 +37,6 @@ class ExportPdfUseCase @Inject constructor(
                     html = html,
                     baseUrl = "file://${draftDir.absolutePath}/",
                     output = output,
-                    documentName = sanitizeFileName(draft.title.ifBlank { "jegyzokonyv" }),
                 )
             }
         }
@@ -49,7 +46,6 @@ class ExportPdfUseCase @Inject constructor(
         html: String,
         baseUrl: String,
         output: File,
-        documentName: String,
     ): File = suspendCancellableCoroutine { cont ->
         val webView = WebView(context).apply {
             settings.javaScriptEnabled = false
@@ -63,136 +59,68 @@ class ExportPdfUseCase @Inject constructor(
             settings.blockNetworkLoads = true
         }
 
-        val state = ExportState(cont, webView)
+        var done = false
+        fun finishOnce(block: () -> Unit) {
+            if (done) return
+            done = true
+            block()
+            runCatching { webView.destroy() }
+        }
 
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView, url: String?) {
                 view.postDelayed({
-                    runCatching { startPrint(view, output, documentName, state) }
-                        .onFailure { state.finishFailure(it) }
-                }, 250)
+                    runCatching { drawToPdf(view, output) }
+                        .onSuccess { finishOnce { cont.resume(it) } }
+                        .onFailure { finishOnce { cont.resumeWithException(it) } }
+                }, IMAGE_SETTLE_DELAY_MS)
             }
         }
 
-        cont.invokeOnCancellation { state.cancel() }
+        cont.invokeOnCancellation { finishOnce {} }
         webView.loadDataWithBaseURL(baseUrl, html, "text/html", "utf-8", null)
     }
 
-    private fun startPrint(
-        webView: WebView,
-        output: File,
-        documentName: String,
-        state: ExportState,
-    ) {
+    private fun drawToPdf(view: WebView, output: File): File {
+        view.measure(
+            View.MeasureSpec.makeMeasureSpec(PAGE_WIDTH_PX, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+        )
+        val contentHeight = view.measuredHeight.coerceAtLeast(PAGE_HEIGHT_PX)
+        view.layout(0, 0, PAGE_WIDTH_PX, contentHeight)
+
         output.parentFile?.mkdirs()
         if (output.exists()) output.delete()
 
-        val attributes = PrintAttributes.Builder()
-            .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
-            .setResolution(PrintAttributes.Resolution("pdf", "pdf", 600, 600))
-            .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
-            .build()
-
-        val adapter: PrintDocumentAdapter = webView.createPrintDocumentAdapter(documentName)
-        state.adapter = adapter
-        adapter.onStart()
-
-        adapter.onLayout(
-            null,
-            attributes,
-            state.cancellation,
-            object : PrintDocumentAdapter.LayoutResultCallback() {
-                override fun onLayoutFinished(info: PrintDocumentInfo?, changed: Boolean) {
-                    runCatching { writePdf(adapter, output, state) }
-                        .onFailure { state.finishFailure(it) }
-                }
-
-                override fun onLayoutFailed(error: CharSequence?) {
-                    state.finishFailure(IllegalStateException("Layout failed: $error"))
-                }
-
-                override fun onLayoutCancelled() {
-                    state.finishFailure(IllegalStateException("Layout cancelled"))
-                }
-            },
-            Bundle(),
-        )
-    }
-
-    private fun writePdf(
-        adapter: PrintDocumentAdapter,
-        output: File,
-        state: ExportState,
-    ) {
-        val pfd = ParcelFileDescriptor.open(
-            output,
-            ParcelFileDescriptor.MODE_READ_WRITE
-                or ParcelFileDescriptor.MODE_CREATE
-                or ParcelFileDescriptor.MODE_TRUNCATE,
-        )
-        state.pfd = pfd
-
-        adapter.onWrite(
-            arrayOf(PageRange.ALL_PAGES),
-            pfd,
-            state.cancellation,
-            object : PrintDocumentAdapter.WriteResultCallback() {
-                override fun onWriteFinished(pages: Array<out PageRange>?) {
-                    state.finishSuccess(output)
-                }
-
-                override fun onWriteFailed(error: CharSequence?) {
-                    state.finishFailure(IllegalStateException("Write failed: $error"))
-                }
-
-                override fun onWriteCancelled() {
-                    state.finishFailure(IllegalStateException("Write cancelled"))
-                }
-            },
-        )
+        val pdf = PdfDocument()
+        try {
+            val pageCount = ((contentHeight + PAGE_HEIGHT_PX - 1) / PAGE_HEIGHT_PX).coerceAtLeast(1)
+            for (i in 0 until pageCount) {
+                val info = PdfDocument.PageInfo
+                    .Builder(PAGE_WIDTH_PX, PAGE_HEIGHT_PX, i + 1)
+                    .create()
+                val page = pdf.startPage(info)
+                page.canvas.save()
+                page.canvas.translate(0f, -(i * PAGE_HEIGHT_PX).toFloat())
+                view.draw(page.canvas)
+                page.canvas.restore()
+                pdf.finishPage(page)
+            }
+            FileOutputStream(output).use { pdf.writeTo(it) }
+        } finally {
+            pdf.close()
+        }
+        return output
     }
 
     private fun sanitizeFileName(value: String): String =
         value.replace(Regex("[^\\p{L}\\p{N}_-]+"), "_").take(64).ifBlank { "jegyzokonyv" }
 
-    private class ExportState(
-        private val cont: kotlinx.coroutines.CancellableContinuation<File>,
-        private val webView: WebView,
-    ) {
-        val cancellation = CancellationSignal()
-        var adapter: PrintDocumentAdapter? = null
-        var pfd: ParcelFileDescriptor? = null
-        private var done = false
-
-        fun finishSuccess(file: File) {
-            if (done) return
-            done = true
-            cleanup()
-            cont.resume(file)
-        }
-
-        fun finishFailure(error: Throwable) {
-            if (done) return
-            done = true
-            cleanup()
-            cont.resumeWithException(error)
-        }
-
-        fun cancel() {
-            if (done) return
-            done = true
-            cancellation.cancel()
-            cleanup()
-        }
-
-        private fun cleanup() {
-            runCatching { adapter?.onFinish() }
-            runCatching { pfd?.close() }
-            runCatching { webView.destroy() }
-        }
-    }
-
     private companion object {
         const val PDF_TIMEOUT_MS = 30_000L
+        const val IMAGE_SETTLE_DELAY_MS = 100L
+        // A4 at 200 DPI: 8.27 in x 11.69 in
+        const val PAGE_WIDTH_PX = 1654
+        const val PAGE_HEIGHT_PX = 2338
     }
 }

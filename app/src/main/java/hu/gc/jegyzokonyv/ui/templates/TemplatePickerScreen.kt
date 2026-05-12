@@ -1,9 +1,11 @@
 package hu.gc.jegyzokonyv.ui.templates
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -11,17 +13,21 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,19 +41,21 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import hu.gc.jegyzokonyv.R
 import hu.gc.jegyzokonyv.domain.model.Template
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import hu.gc.jegyzokonyv.ui.common.ConfirmDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TemplatePickerScreen(
     onDraftCreated: (String) -> Unit,
+    onNewTemplate: () -> Unit,
+    onEditTemplate: (String) -> Unit,
     onBack: () -> Unit,
     viewModel: TemplatePickerViewModel = hiltViewModel(),
 ) {
     val templates by viewModel.templates.collectAsStateWithLifecycle()
-    var pending by remember { mutableStateOf<Template?>(null) }
+    var pendingActions by remember { mutableStateOf<Template?>(null) }
+    var pendingDelete by remember { mutableStateOf<Template?>(null) }
+    val copySuffix = stringResource(R.string.template_default_copy_suffix)
 
     Scaffold(
         topBar = {
@@ -61,6 +69,13 @@ fun TemplatePickerScreen(
                         )
                     }
                 },
+            )
+        },
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = onNewTemplate,
+                icon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                text = { Text(stringResource(R.string.templates_new_template)) },
             )
         },
     ) { padding ->
@@ -79,76 +94,143 @@ fun TemplatePickerScreen(
                 contentPadding = PaddingValues(
                     start = 16.dp, end = 16.dp,
                     top = padding.calculateTopPadding() + 8.dp,
-                    bottom = padding.calculateBottomPadding() + 16.dp,
+                    bottom = padding.calculateBottomPadding() + 96.dp,
                 ),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 items(templates, key = { it.id }) { template ->
-                    TemplateRow(template = template, onClick = { pending = template })
+                    TemplateRow(
+                        template = template,
+                        onClick = { viewModel.createDraft(template.id, onCreated = onDraftCreated) },
+                        onLongPress = { pendingActions = template },
+                    )
                 }
             }
         }
     }
 
-    val choice = pending
-    if (choice != null) {
-        NewDraftTitleDialog(
-            defaultTitle = defaultDraftTitle(),
-            onDismiss = { pending = null },
-            onConfirm = { title ->
-                pending = null
-                viewModel.createDraft(choice.id, title, onCreated = onDraftCreated)
+    pendingActions?.let { selected ->
+        TemplateActionsSheet(
+            template = selected,
+            onDismiss = { pendingActions = null },
+            onDuplicate = {
+                pendingActions = null
+                viewModel.duplicate(selected.id, copySuffix, onDuplicated = onEditTemplate)
+            },
+            onEdit = {
+                pendingActions = null
+                onEditTemplate(selected.id)
+            },
+            onDelete = {
+                pendingActions = null
+                pendingDelete = selected
             },
         )
     }
-}
 
-@Composable
-private fun TemplateRow(template: Template, onClick: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-    ) {
-        Text(
-            text = template.name,
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(20.dp),
+    pendingDelete?.let { target ->
+        ConfirmDialog(
+            title = stringResource(R.string.template_action_delete_title),
+            message = stringResource(R.string.template_action_delete_message),
+            confirmLabel = stringResource(R.string.template_action_delete),
+            onConfirm = {
+                viewModel.delete(target.id)
+                pendingDelete = null
+            },
+            onDismiss = { pendingDelete = null },
         )
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun NewDraftTitleDialog(
-    defaultTitle: String,
-    onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit,
+private fun TemplateRow(
+    template: Template,
+    onClick: () -> Unit,
+    onLongPress: () -> Unit,
 ) {
-    var title by remember { mutableStateOf(defaultTitle) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.dialog_new_draft_title)) },
-        text = {
-            OutlinedTextField(
-                value = title,
-                onValueChange = { title = it },
-                label = { Text(stringResource(R.string.dialog_new_draft_hint)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(onClick = onClick, onLongClick = onLongPress),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = template.name,
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.weight(1f),
             )
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(title) }) {
-                Text(stringResource(R.string.action_create))
+            if (template.isBuiltIn) {
+                AssistChip(
+                    onClick = {},
+                    enabled = false,
+                    label = { Text(stringResource(R.string.templates_built_in_badge)) },
+                    colors = AssistChipDefaults.assistChipColors(),
+                )
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
-        },
-    )
+        }
+    }
 }
 
-private fun defaultDraftTitle(): String {
-    val now = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale("hu", "HU")).format(Date())
-    return "Jegyzőkönyv $now"
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TemplateActionsSheet(
+    template: Template,
+    onDismiss: () -> Unit,
+    onDuplicate: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState()
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+    ) {
+        Text(
+            text = template.name,
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 12.dp),
+        )
+        SheetAction(
+            label = stringResource(R.string.template_action_duplicate),
+            onClick = onDuplicate,
+        )
+        if (!template.isBuiltIn) {
+            SheetAction(
+                label = stringResource(R.string.template_action_edit),
+                onClick = onEdit,
+            )
+            SheetAction(
+                label = stringResource(R.string.template_action_delete),
+                onClick = onDelete,
+            )
+        }
+        Box(modifier = Modifier.padding(bottom = 12.dp))
+    }
+}
+
+@Composable
+private fun SheetAction(label: String, onClick: () -> Unit) {
+    TextButton(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+        )
+    }
 }

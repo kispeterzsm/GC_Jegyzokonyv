@@ -19,4 +19,7 @@ interface TemplateDao {
 
     @Query("SELECT COUNT(*) FROM templates WHERE isBuiltIn = 1")
     suspend fun countBuiltIn(): Int
+
+    @Query("DELETE FROM templates WHERE id = :id AND isBuiltIn = 0")
+    suspend fun deleteUserTemplate(id: String): Int
 }

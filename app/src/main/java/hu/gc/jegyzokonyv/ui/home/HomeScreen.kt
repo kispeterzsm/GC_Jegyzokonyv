@@ -1,5 +1,6 @@
 package hu.gc.jegyzokonyv.ui.home
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -127,6 +128,7 @@ private fun DraftList(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun DraftRow(
     draft: Draft,

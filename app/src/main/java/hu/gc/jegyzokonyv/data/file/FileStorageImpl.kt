@@ -14,6 +14,9 @@ class FileStorageImpl @Inject constructor(
     override val draftsRoot: File
         get() = File(context.filesDir, "drafts").also { it.mkdirs() }
 
+    override val templatesRoot: File
+        get() = File(context.filesDir, "templates").also { it.mkdirs() }
+
     override fun draftDir(draftId: String): File =
         File(draftsRoot, draftId).also { it.mkdirs() }
 
@@ -26,8 +29,20 @@ class FileStorageImpl @Inject constructor(
     override fun metadataJson(draftId: String): File =
         File(draftDir(draftId), "metadata.json")
 
-    override fun exportPdf(draftId: String): File =
-        File(draftDir(draftId), "export.pdf")
+    override fun exportPdf(draftId: String, filename: String): File =
+        File(draftDir(draftId), filename)
+
+    override fun latestExportedPdf(draftId: String): File? {
+        val dir = draftDir(draftId)
+        return dir.listFiles { _, name -> name.endsWith(".pdf", ignoreCase = true) }
+            ?.maxByOrNull { it.lastModified() }
+    }
+
+    override fun deleteExportedPdfs(draftId: String) {
+        val dir = draftDir(draftId)
+        dir.listFiles { _, name -> name.endsWith(".pdf", ignoreCase = true) }
+            ?.forEach { it.delete() }
+    }
 
     override fun newImageFile(draftId: String): File {
         val dir = imagesDir(draftId)
@@ -41,6 +56,13 @@ class FileStorageImpl @Inject constructor(
 
     override fun deleteDraft(draftId: String) {
         draftDir(draftId).deleteRecursively()
+    }
+
+    override fun userTemplateFile(templateId: String): File =
+        File(templatesRoot, "$templateId.json")
+
+    override fun deleteUserTemplateFile(templateId: String) {
+        userTemplateFile(templateId).delete()
     }
 
     private companion object {
