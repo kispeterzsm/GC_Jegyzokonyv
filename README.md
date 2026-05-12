@@ -8,6 +8,17 @@ Package: `hu.gc.jegyzokonyv` · Min SDK 26 · Kotlin + Jetpack Compose
 
 See [`PLAN.md`](./PLAN.md) for the full product vision.
 
+## APK Download
+
+Latest local debug build:
+[`app-debug.apk`](./app/build/outputs/apk/debug/app-debug.apk)
+
+Install it on a connected Android device with:
+
+```sh
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
 ## Building
 
 This repository ships the Gradle wrapper scripts (`gradlew`, `gradlew.bat`) but
@@ -21,7 +32,7 @@ gradle wrapper --gradle-version 8.9
 Then:
 
 ```sh
-./gradlew :app:assembleDebug         # build APK at app/build/outputs/apk/debug/
+./build-apk.sh debug                 # build APK at app/build/outputs/apk/debug/
 ./gradlew :app:installDebug          # install on connected device/emulator
 adb shell am start -n hu.gc.jegyzokonyv/.MainActivity
 ```
@@ -39,9 +50,9 @@ Phase 1 MVP. See `PLAN.md` for the roadmap. Currently implemented:
 - Append freestanding text blocks
 - Live HTML preview (WebView)
 - Autosaved HTML on disk (source of truth)
-- Export PDF via WebView print adapter
+- Fast native PDF export with downsampled images
 - Share PDF via Android share sheet
 - Draft list with delete
 
 Not yet implemented (later phases): DOCX export, template editor, block
-reorder/edit, image downscaling, encryption.
+reorder/edit, encryption.
