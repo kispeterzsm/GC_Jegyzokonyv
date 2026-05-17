@@ -6,8 +6,6 @@ accounts, or cloud storage.
 
 Package: `hu.gc.jegyzokonyv` · Min SDK 26 · Kotlin + Jetpack Compose
 
-See [`PLAN.md`](./PLAN.md) for the full product vision.
-
 ## APK Download
 
 Latest debug APK:
@@ -39,20 +37,3 @@ adb shell am start -n hu.gc.jegyzokonyv/.MainActivity
 
 Requirements: JDK 17, Android SDK with platform 34 installed, a device or
 emulator running Android 8.0 (API 26) or newer.
-
-## Status
-
-Phase 1 MVP. See `PLAN.md` for the roadmap. Currently implemented:
-
-- Single bundled "Helyszíni szemle" inspection template
-- Create draft from template
-- Take photo (CameraX), append photo block with caption
-- Append freestanding text blocks
-- Live HTML preview (WebView)
-- Autosaved HTML on disk (source of truth)
-- Fast native PDF export with downsampled images
-- Share PDF via Android share sheet
-- Draft list with delete
-
-Not yet implemented (later phases): DOCX export, template editor, block
-reorder/edit, encryption.
