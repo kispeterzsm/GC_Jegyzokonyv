@@ -47,8 +47,13 @@ class ExportPdfUseCase @Inject constructor(
 
         return withTimeout(PDF_TIMEOUT_MS) {
             withContext(Dispatchers.IO) {
-                val document = parseExportDocument(html, draftDir)
-                val stats = renderNativePdf(document, tempOutput)
+                val safetyDocument = parseSafetyDocument(html, draftDir)
+                val stats = if (safetyDocument != null) {
+                    renderSafetyPdf(safetyDocument, tempOutput)
+                } else {
+                    val document = parseExportDocument(html, draftDir)
+                    renderNativePdf(document, tempOutput)
+                }
                 replacePdf(tempOutput, output)
                 deleteOtherExportedPdfs(draftDir, output)
                 deleteLegacyExportImageCache(draftDir)
@@ -57,7 +62,7 @@ class ExportPdfUseCase @Inject constructor(
                 Log.i(
                     TAG,
                     "PDF export finished in ${elapsedMs}ms, " +
-                        "pages=${stats.pageCount}, blocks=${document.blocks.size}, " +
+                        "pages=${stats.pageCount}, " +
                         "images=${stats.imageCount}",
                 )
                 output
@@ -158,6 +163,55 @@ class ExportPdfUseCase @Inject constructor(
         }
     }
 
+    private fun parseSafetyDocument(html: String, draftDir: File): SafetyDocument? {
+        val doc = Jsoup.parse(html)
+        if (!doc.body().hasClass(SAFETY_CLASS)) return null
+
+        val dateText = doc.selectFirst(".inspection-row")?.wholeText()
+            ?.substringAfter("Dátum:", "")
+            ?.trim()
+            ?.ifBlank { null }
+            ?: ""
+        val observations = doc.select(".safety-observation").mapIndexed { index, element ->
+            val table = element.selectFirst(".observation-table")
+            fun field(name: String): String =
+                table?.selectFirst("[data-field=$name]")?.wholeText()?.trim().orEmpty()
+            val source = element.selectFirst("img[src]")?.attr("src").orEmpty()
+            SafetyObservation(
+                index = element.attr("data-index").toIntOrNull() ?: index + 1,
+                image = resolveDraftImage(draftDir, source)?.takeIf { it.isFile },
+                source = source,
+                riskScore = field("risk_score"),
+                riskLevel = field("risk_level"),
+                hazardSource = field("hazard_source"),
+                hazardSituation = field("hazard_situation"),
+                prevention = field("prevention"),
+                deadline = field("deadline"),
+                responsible = field("responsible"),
+                sanction = field("sanction"),
+                followUp = field("follow_up"),
+            )
+        }
+        return SafetyDocument(dateText = dateText, observations = observations)
+    }
+
+    private fun renderSafetyPdf(document: SafetyDocument, output: File): ExportStats {
+        output.parentFile?.mkdirs()
+        if (output.exists()) output.delete()
+
+        val renderer = SafetyPdfRenderer(document)
+        return try {
+            val stats = renderer.render()
+            FileOutputStream(output).use { renderer.writeTo(it) }
+            stats
+        } catch (error: Throwable) {
+            output.delete()
+            throw error
+        } finally {
+            renderer.close()
+        }
+    }
+
     private fun replacePdf(tempOutput: File, output: File) {
         output.parentFile?.mkdirs()
         Files.move(
@@ -182,6 +236,309 @@ class ExportPdfUseCase @Inject constructor(
 
     private fun sanitizeFileName(value: String): String =
         value.replace(Regex("[^\\p{L}\\p{N}_-]+"), "_").take(64).ifBlank { "jegyzokonyv" }
+
+    private class SafetyPdfRenderer(
+        private val document: SafetyDocument,
+    ) {
+        private val pdf = PdfDocument()
+        private var page: PdfDocument.Page? = null
+        private var pageNumber = 0
+        private var imageCount = 0
+        private var y = SAFETY_MARGIN_PT
+
+        private val textPaint = textPaint(size = 12f, color = Color.BLACK)
+        private val boldPaint = textPaint(size = 12f, color = Color.BLACK, typeface = Typeface.DEFAULT_BOLD)
+        private val headerPaint = textPaint(size = 16f, color = Color.BLACK, typeface = Typeface.DEFAULT_BOLD)
+        private val smallPaint = textPaint(size = 10.5f, color = Color.BLACK)
+        private val redBoldPaint = textPaint(size = 12f, color = Color.RED, typeface = Typeface.DEFAULT_BOLD)
+        private val orangeBoldPaint = textPaint(size = 12f, color = Color.rgb(245, 168, 0), typeface = Typeface.DEFAULT_BOLD)
+        private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            style = Paint.Style.STROKE
+            strokeWidth = 0.8f
+        }
+        private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+        private val imagePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            isFilterBitmap = true
+            isDither = true
+        }
+
+        fun render(): ExportStats {
+            startPage()
+            drawSafetyHeader(null)
+            drawIntro()
+            finishCurrentPage()
+            document.observations.forEach { observation ->
+                startPage()
+                drawSafetyHeader("${observation.index}.")
+                drawObservation(observation)
+                finishCurrentPage()
+            }
+            return ExportStats(pageCount = pageNumber, imageCount = imageCount)
+        }
+
+        fun writeTo(output: FileOutputStream) {
+            pdf.writeTo(output)
+        }
+
+        fun close() {
+            runCatching { finishCurrentPage() }
+            pdf.close()
+        }
+
+        private fun drawIntro() {
+            y += 14f
+            drawText("Generálkivitelező: Gépész Centrál Kft.", boldPaint, SAFETY_MARGIN_PT + 22f, y, SAFETY_WIDTH_PT - 44f)
+            y += 28f
+            drawText("Az ellenőrzést végezte:", boldPaint, SAFETY_MARGIN_PT + 22f, y, 170f)
+            drawText("Kispéter Ákosné", boldPaint, SAFETY_MARGIN_PT + 215f, y, 150f)
+            drawText("Dátum: ${document.dateText}", boldPaint, SAFETY_MARGIN_PT + 395f, y, 150f)
+            y += 30f
+            drawText("Megfelelt: ✓        Nem felelt meg: X", textPaint, SAFETY_MARGIN_PT + 22f, y, SAFETY_WIDTH_PT - 44f)
+            y += 28f
+            drawText("Az együttműködés előmozdítása érdekében tett intézkedések", boldPaint, SAFETY_MARGIN_PT + 22f, y, SAFETY_WIDTH_PT - 44f)
+            y += 26f
+            listOf(
+                "beléptetés megoldása ✓",
+                "generálkivitelező FMV a helyszínen ✓",
+                "BEK bejárás heti 1 alkalommal ✓",
+                "ellenőrzési tapasztalatok megküldése és a megelőzés számonkérése ✓",
+                "különböző munkáltatók tevékenységének összehangolása építésvezetői közreműködéssel ✓",
+                "napi tájékoztatók ✓",
+            ).forEach {
+                drawText("-   $it", textPaint, SAFETY_MARGIN_PT + 40f, y, SAFETY_WIDTH_PT - 80f)
+                y += if (it.length > 70) 32f else 18f
+            }
+            y += 8f
+            drawText("Munkaterület állapota a mai napon", boldPaint, SAFETY_MARGIN_PT + 22f, y, SAFETY_WIDTH_PT - 44f)
+            y += 28f
+            drawText("Értékelés módja kockázat alapú:", textPaint, SAFETY_MARGIN_PT + 22f, y, SAFETY_WIDTH_PT - 44f)
+            y += 24f
+            drawRiskMatrix()
+            y += 24f
+            drawRiskLevels()
+            drawPageNumber()
+        }
+
+        private fun drawRiskMatrix() {
+            val left = SAFETY_MARGIN_PT + 22f
+            val top = y
+            val widths = floatArrayOf(88f, 88f, 88f, 88f, 88f, 88f)
+            val heights = floatArrayOf(68f, 22f, 34f, 22f, 34f, 22f)
+            val rows = listOf(
+                listOf("következmény\n\nvalószínűség", "nincs hatás,\nvagy a hatás\njelentéktelen", "könnyebb\nsérülést okoz", "jelentős\nsérülést okoz", "súlyos sérülést\nokoz", "fokozottan\nsúlyos vagy\nhalálos\nkimenetelű"),
+                listOf("valószínűtlen", "1", "2", "3", "4", "5"),
+                listOf("inkább nem\nfordul elő", "2", "4", "6", "8", "10"),
+                listOf("lehetséges", "3", "6", "9", "12", "15"),
+                listOf("valószínűleg\nelőfordul", "4", "8", "12", "16", "20"),
+                listOf("elkerülhetetlen", "5", "10", "15", "20", "25"),
+            )
+            rows.forEachIndexed { rowIndex, row ->
+                var x = left
+                row.forEachIndexed { col, value ->
+                    val color = when {
+                        rowIndex == 0 || col == 0 -> Color.WHITE
+                        value.toIntOrNull() in 1..4 -> COLOR_LOW
+                        value.toIntOrNull() in 5..10 -> COLOR_MEDIUM
+                        else -> COLOR_HIGH
+                    }
+                    drawCell(RectF(x, y, x + widths[col], y + heights[rowIndex]), value, smallPaint, color, center = col > 0 && rowIndex > 0)
+                    x += widths[col]
+                }
+                y += heights[rowIndex]
+            }
+            y = top + heights.sum()
+        }
+
+        private fun drawRiskLevels() {
+            val left = SAFETY_MARGIN_PT + 22f
+            val widths = floatArrayOf(92f, 128f, 306f)
+            val rows = listOf(
+                Triple("kockázati szint", "végrehajtási határidő", ""),
+                Triple("magas", "azonnali", "intézkedésig munka nem végezhető"),
+                Triple("közepes", "rövid határidő", "intézkedésig 1-3 nap türelmi idő engedélyezett, addig munka csak feltételekkel végezhető"),
+                Triple("alacsony", "hosszabb határidő", "a munkavégzés megengedett, intézkedni a következő bejárás, karbantartás, javítás alkalmáig kell (1 hét)"),
+            )
+            rows.forEachIndexed { index, row ->
+                val height = if (index >= 2) 34f else 20f
+                var x = left
+                val fill = when (index) {
+                    1 -> COLOR_HIGH
+                    2 -> COLOR_MEDIUM
+                    3 -> COLOR_LOW
+                    else -> Color.WHITE
+                }
+                drawCell(RectF(x, y, x + widths[0], y + height), row.first, if (index == 0) boldPaint else textPaint, fill)
+                x += widths[0]
+                drawCell(RectF(x, y, x + widths[1], y + height), row.second, if (index == 0) boldPaint else textPaint)
+                x += widths[1]
+                drawCell(RectF(x, y, x + widths[2], y + height), row.third, textPaint)
+                y += height
+            }
+        }
+
+        private fun drawObservation(observation: SafetyObservation) {
+            val tableHeight = OBSERVATION_TABLE_HEIGHT_PT
+            val imageTop = y + 12f
+            val maxImageHeight = (PAGE_BOTTOM_PT - imageTop - tableHeight - 10f).coerceAtLeast(110f)
+            val imageBottom = drawObservationImage(observation, imageTop, maxImageHeight)
+            y = imageBottom + 8f
+            drawObservationTable(observation)
+            drawPageNumber()
+        }
+
+        private fun drawObservationImage(observation: SafetyObservation, top: Float, maxHeight: Float): Float {
+            val image = observation.image ?: return top
+            val bounds = decodeImageBounds(image) ?: return top
+            val orientation = readOrientation(image)
+            val size = bounds.displaySize(orientation)
+            var width = SAFETY_WIDTH_PT
+            var height = width * size.height.toFloat() / size.width.toFloat()
+            if (height > maxHeight) {
+                val scale = maxHeight / height
+                width *= scale
+                height *= scale
+            }
+            val left = SAFETY_MARGIN_PT + (SAFETY_WIDTH_PT - width) / 2f
+            val target = RectF(left, top, left + width, top + height)
+            if (drawBitmap(image, bounds, orientation, target)) imageCount += 1
+            return target.bottom
+        }
+
+        private fun drawObservationTable(observation: SafetyObservation) {
+            val left = SAFETY_MARGIN_PT
+            val labelWidth = 112f
+            val valueWidth = SAFETY_WIDTH_PT - labelWidth
+            fun row(label: String, value: String, height: Float) {
+                drawCell(RectF(left, y, left + labelWidth, y + height), label, boldPaint)
+                drawCell(RectF(left + labelWidth, y, left + labelWidth + valueWidth, y + height), value, textPaint)
+                y += height
+            }
+            drawCell(RectF(left, y, left + labelWidth, y + 24f), "kockázati szint", boldPaint)
+            drawCell(RectF(left + labelWidth, y, left + labelWidth + 175f, y + 24f), observation.riskScore, textPaint)
+            val riskPaint = if (observation.riskLevel.equals("magas", true)) redBoldPaint else if (observation.riskLevel.equals("közepes", true)) orangeBoldPaint else boldPaint
+            drawCell(RectF(left + labelWidth + 175f, y, left + labelWidth + valueWidth, y + 24f), observation.riskLevel, riskPaint)
+            y += 24f
+            row("veszély forrása", observation.hazardSource, 38f)
+            row("veszélyhelyzet", observation.hazardSituation, 48f)
+            row("megelőzés", observation.prevention, 90f)
+            drawCell(RectF(left, y, left + labelWidth, y + 38f), "határidő", boldPaint)
+            drawCell(RectF(left + labelWidth, y, left + labelWidth + 150f, y + 38f), observation.deadline, textPaint)
+            drawCell(RectF(left + labelWidth + 150f, y, left + labelWidth + 205f, y + 38f), "felelős", textPaint, center = true)
+            drawCell(RectF(left + labelWidth + 205f, y, left + labelWidth + valueWidth, y + 38f), observation.responsible, textPaint)
+            y += 38f
+            row("szankció", observation.sanction, 28f)
+            row("visszaellenőrzés", observation.followUp, 44f)
+        }
+
+        private fun drawSafetyHeader(index: String?) {
+            val widths = if (index == null) {
+                floatArrayOf(148f, 280f, 167f)
+            } else {
+                floatArrayOf(140f, 265f, 140f, 50f)
+            }
+            val values = if (index == null) {
+                listOf("Párta köz 4.\nBET", "MUNKAVÉDELMI BEJÁRÁS\nELLENŐRZÉSI jegyzőkönyv", "7/B melléklet")
+            } else {
+                listOf("Párta köz 4.\nBET", "MUNKAVÉDELMI BEJÁRÁS\nELLENŐRZÉSI jegyzőkönyv", "7/B melléklet", index)
+            }
+            var x = 0f
+            values.forEachIndexed { i, value ->
+                drawCell(RectF(x, SAFETY_MARGIN_PT, x + widths[i], SAFETY_MARGIN_PT + 42f), value, headerPaint, Color.rgb(232, 232, 232), center = true)
+                x += widths[i]
+            }
+            y = SAFETY_MARGIN_PT + 58f
+        }
+
+        private fun drawCell(
+            rect: RectF,
+            text: String,
+            paint: TextPaint,
+            fill: Int = Color.WHITE,
+            center: Boolean = false,
+        ) {
+            fillPaint.color = fill
+            canvas.drawRect(rect, fillPaint)
+            canvas.drawRect(rect, borderPaint)
+            val layout = staticLayout(text, paint, (rect.width() - 8f).roundToInt().coerceAtLeast(1))
+            val textY = if (center) rect.top + ((rect.height() - layout.height) / 2f).coerceAtLeast(2f) else rect.top + 3f
+            canvas.save()
+            canvas.clipRect(rect)
+            canvas.translate(rect.left + 4f, textY)
+            layout.draw(canvas)
+            canvas.restore()
+        }
+
+        private fun drawText(text: String, paint: TextPaint, left: Float, top: Float, width: Float) {
+            val layout = staticLayout(text, paint, width.roundToInt())
+            drawStaticLayout(layout, left, top)
+        }
+
+        private fun drawStaticLayout(layout: StaticLayout, left: Float, top: Float) {
+            canvas.save()
+            canvas.translate(left, top)
+            layout.draw(canvas)
+            canvas.restore()
+        }
+
+        private fun drawBitmap(image: File, bounds: ImageBounds, orientation: Int, target: RectF): Boolean {
+            val targetPixels = targetPixelSize(target.width(), target.height(), orientation)
+            val options = BitmapFactory.Options().apply {
+                inSampleSize = calculateInSampleSize(bounds.width, bounds.height, targetPixels.width, targetPixels.height)
+            }
+            val decoded = BitmapFactory.decodeFile(image.absolutePath, options) ?: return false
+            var oriented: Bitmap? = null
+            var scaled: Bitmap? = null
+            return try {
+                oriented = applyOrientation(decoded, orientation)
+                scaled = scaleForPdf(oriented, targetPixels)
+                canvas.drawBitmap(scaled, null, target, imagePaint)
+                true
+            } finally {
+                if (scaled != null && scaled !== oriented) scaled.recycle()
+                if (oriented != null && oriented !== decoded) oriented.recycle()
+                decoded.recycle()
+            }
+        }
+
+        private fun targetPixelSize(widthPt: Float, heightPt: Float, orientation: Int): ImageSize {
+            val displayWidth = (widthPt * IMAGE_DPI / POINTS_PER_INCH).roundToInt().coerceAtLeast(1)
+            val displayHeight = (heightPt * IMAGE_DPI / POINTS_PER_INCH).roundToInt().coerceAtLeast(1)
+            return if (swapsAxes(orientation)) ImageSize(displayHeight, displayWidth) else ImageSize(displayWidth, displayHeight)
+        }
+
+        private fun scaleForPdf(bitmap: Bitmap, target: ImageSize): Bitmap {
+            val scale = min(target.width.toFloat() / bitmap.width.toFloat(), target.height.toFloat() / bitmap.height.toFloat())
+            if (scale >= 0.95f) return bitmap
+            return Bitmap.createScaledBitmap(
+                bitmap,
+                (bitmap.width * scale).roundToInt().coerceAtLeast(1),
+                (bitmap.height * scale).roundToInt().coerceAtLeast(1),
+                true,
+            )
+        }
+
+        private fun drawPageNumber() {
+            drawText(pageNumber.toString(), textPaint, PAGE_WIDTH_PT / 2f - 8f, PAGE_HEIGHT_PT - 34f, 24f)
+        }
+
+        private fun startPage() {
+            finishCurrentPage()
+            pageNumber += 1
+            page = pdf.startPage(PdfDocument.PageInfo.Builder(PAGE_WIDTH_PT.roundToInt(), PAGE_HEIGHT_PT.roundToInt(), pageNumber).create())
+            y = SAFETY_MARGIN_PT
+        }
+
+        private fun finishCurrentPage() {
+            page?.let {
+                pdf.finishPage(it)
+                page = null
+            }
+        }
+
+        private val canvas: Canvas
+            get() = requireNotNull(page).canvas
+    }
 
     private class NativePdfRenderer(
         private val document: ExportDocument,
@@ -474,6 +831,26 @@ class ExportPdfUseCase @Inject constructor(
         val blocks: List<ExportBlock>,
     )
 
+    private data class SafetyDocument(
+        val dateText: String,
+        val observations: List<SafetyObservation>,
+    )
+
+    private data class SafetyObservation(
+        val index: Int,
+        val image: File?,
+        val source: String,
+        val riskScore: String,
+        val riskLevel: String,
+        val hazardSource: String,
+        val hazardSituation: String,
+        val prevention: String,
+        val deadline: String,
+        val responsible: String,
+        val sanction: String,
+        val followUp: String,
+    )
+
     private sealed class ExportBlock {
         data class Text(
             val text: String,
@@ -518,6 +895,7 @@ class ExportPdfUseCase @Inject constructor(
         const val TAG = "ExportPdf"
         const val PDF_TIMEOUT_MS = 30_000L
         const val CONTENT_ID = "content"
+        const val SAFETY_CLASS = "safety-walkthrough"
         const val DEFAULT_TITLE = "Jegyzőkönyv"
         const val LEGACY_EXPORT_IMAGES_DIR = ".pdf_images"
 
@@ -529,6 +907,12 @@ class ExportPdfUseCase @Inject constructor(
         const val CONTENT_WIDTH_PT = PAGE_WIDTH_PT - (PAGE_MARGIN_PT * 2f)
         const val USABLE_HEIGHT_PT = PAGE_HEIGHT_PT - (PAGE_MARGIN_PT * 2f)
         const val PAGE_BOTTOM_PT = PAGE_HEIGHT_PT - PAGE_MARGIN_PT
+        const val SAFETY_MARGIN_PT = 42f
+        const val SAFETY_WIDTH_PT = PAGE_WIDTH_PT - (SAFETY_MARGIN_PT * 2f)
+        const val OBSERVATION_TABLE_HEIGHT_PT = 310f
+        const val COLOR_LOW = 0xFF92D050.toInt()
+        const val COLOR_MEDIUM = 0xFFFFFF00.toInt()
+        const val COLOR_HIGH = 0xFFFF0000.toInt()
 
         fun textPaint(
             size: Float,

@@ -1,0 +1,8 @@
+{
+  "title": "Munkavédelmi bejárás",
+  "kind": "safety_walkthrough",
+  "version": 1,
+  "blocks": [
+    { "id": "builtin-work-safety-date", "type": "date" }
+  ]
+}

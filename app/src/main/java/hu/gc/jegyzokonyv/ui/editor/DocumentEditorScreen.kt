@@ -76,6 +76,7 @@ fun DocumentEditorScreen(
     val exportSuccessMsg = stringResource(R.string.editor_export_success)
     val exportFailMsg = stringResource(R.string.editor_export_failed)
     val chooserTitle = stringResource(R.string.share_chooser_title)
+    val isSafetyWalkthrough = html.contains("safety-walkthrough")
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -96,13 +97,18 @@ fun DocumentEditorScreen(
     }
 
     val currentEntry by navController.currentBackStackEntryAsState()
-    LaunchedEffect(currentEntry) {
+    LaunchedEffect(currentEntry, html) {
         val savedStateHandle = currentEntry?.savedStateHandle ?: return@LaunchedEffect
         val pending = savedStateHandle.get<String>(Routes.RESULT_KEY_IMAGE_PATH)
         if (pending != null) {
+            if (html.isBlank()) return@LaunchedEffect
             savedStateHandle.remove<String>(Routes.RESULT_KEY_IMAGE_PATH)
-            pendingPhotoPath = pending
-            showCaption = true
+            if (isSafetyWalkthrough) {
+                viewModel.onPhotoCaptured(pending, null)
+            } else {
+                pendingPhotoPath = pending
+                showCaption = true
+            }
         }
     }
 
@@ -166,6 +172,7 @@ fun DocumentEditorScreen(
             BottomActionBar(
                 onAddPhoto = onTakePhoto,
                 onAddText = { showAddText = true },
+                canAddText = !isSafetyWalkthrough,
             )
         },
     ) { padding ->
@@ -173,6 +180,7 @@ fun DocumentEditorScreen(
             EditorHtmlWebView(
                 html = html,
                 draftDir = viewModel.draftFolder(),
+                onHtmlChanged = viewModel::onDocumentHtmlChanged,
                 modifier = Modifier.fillMaxSize(),
             )
             if (isExporting) {
@@ -260,6 +268,7 @@ fun DocumentEditorScreen(
 private fun BottomActionBar(
     onAddPhoto: () -> Unit,
     onAddText: () -> Unit,
+    canAddText: Boolean,
 ) {
     Surface(
         tonalElevation = 4.dp,
@@ -274,22 +283,24 @@ private fun BottomActionBar(
             OutlinedButton(
                 onClick = onAddPhoto,
                 modifier = Modifier
-                    .weight(1f)
+                    .weight(if (canAddText) 1f else 2f)
                     .heightIn(min = 56.dp),
             ) {
                 Icon(Icons.Filled.Camera, contentDescription = null)
                 Spacer(Modifier.size(8.dp))
                 Text(stringResource(R.string.editor_add_photo))
             }
-            OutlinedButton(
-                onClick = onAddText,
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 56.dp),
-            ) {
-                Icon(Icons.Filled.Edit, contentDescription = null)
-                Spacer(Modifier.size(8.dp))
-                Text(stringResource(R.string.editor_add_text))
+            if (canAddText) {
+                OutlinedButton(
+                    onClick = onAddText,
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 56.dp),
+                ) {
+                    Icon(Icons.Filled.Edit, contentDescription = null)
+                    Spacer(Modifier.size(8.dp))
+                    Text(stringResource(R.string.editor_add_text))
+                }
             }
         }
     }

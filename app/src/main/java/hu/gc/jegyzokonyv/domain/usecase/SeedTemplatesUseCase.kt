@@ -8,8 +8,14 @@ class SeedTemplatesUseCase @Inject constructor(
     private val templateDao: TemplateDao,
 ) {
     suspend operator fun invoke() {
-        if (templateDao.countBuiltIn() > 0) return
-        templateDao.upsert(
+        builtInTemplates.forEach { templateDao.upsert(it) }
+    }
+
+    companion object {
+        const val BUILTIN_INSPECTION_ID = "builtin-inspection"
+        const val BUILTIN_WORK_SAFETY_WALKTHROUGH_ID = "builtin-work-safety-walkthrough"
+
+        private val builtInTemplates = listOf(
             TemplateEntity(
                 id = BUILTIN_INSPECTION_ID,
                 name = "Helyszíni szemle",
@@ -17,11 +23,15 @@ class SeedTemplatesUseCase @Inject constructor(
                 assetPath = "templates/inspection.json",
                 filePath = null,
                 isBuiltIn = true,
-            )
+            ),
+            TemplateEntity(
+                id = BUILTIN_WORK_SAFETY_WALKTHROUGH_ID,
+                name = "Munkavédelmi bejárás",
+                title = "Munkavédelmi bejárás",
+                assetPath = "templates/work_safety_walkthrough.json",
+                filePath = null,
+                isBuiltIn = true,
+            ),
         )
-    }
-
-    companion object {
-        const val BUILTIN_INSPECTION_ID = "builtin-inspection"
     }
 }

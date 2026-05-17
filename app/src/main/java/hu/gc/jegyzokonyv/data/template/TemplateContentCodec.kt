@@ -2,6 +2,7 @@ package hu.gc.jegyzokonyv.data.template
 
 import hu.gc.jegyzokonyv.domain.model.TemplateBlock
 import hu.gc.jegyzokonyv.domain.model.TemplateContent
+import hu.gc.jegyzokonyv.domain.model.TemplateKind
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
@@ -26,6 +27,7 @@ object TemplateContentCodec {
         }
         val root = JSONObject()
             .put("title", content.title)
+            .put("kind", content.kind.jsonValue)
             .put("blocks", blocksArray)
             .put("version", 1)
         return root.toString(2)
@@ -34,6 +36,7 @@ object TemplateContentCodec {
     fun decode(json: String): TemplateContent {
         val root = JSONObject(json)
         val title = root.optString("title", "")
+        val kind = TemplateKind.fromJson(root.optString("kind", TemplateKind.Standard.jsonValue))
         val blocksJson = root.optJSONArray("blocks") ?: JSONArray()
         val blocks = buildList {
             for (i in 0 until blocksJson.length()) {
@@ -45,6 +48,6 @@ object TemplateContentCodec {
                 }
             }
         }
-        return TemplateContent(title = title, blocks = blocks)
+        return TemplateContent(title = title, kind = kind, blocks = blocks)
     }
 }
