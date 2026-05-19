@@ -235,36 +235,33 @@ fun DocumentEditorScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
-            if (!focusedEditableCell) {
-                BottomActionBar(
-                    onAddPhoto = onTakePhoto,
-                    onAddText = { showAddText = true },
-                    canAddText = !isSafetyWalkthrough,
-                    canDictate = false,
-                    isDictating = isListening,
-                    onDictate = {
-                        if (isListening) {
-                            speechRecognizer?.cancel()
-                            isListening = false
-                        } else if (!focusedEditableCell) {
-                            snackbarScope.launch { snackbarHostState.showSnackbar(dictationNoCellMsg) }
-                        } else if (speechRecognizer == null) {
-                            snackbarScope.launch { snackbarHostState.showSnackbar(dictationUnavailableMsg) }
-                        } else if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-                            speechRecognizer.startListening(hungarianSpeechIntent())
-                        } else {
-                            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                        }
-                    },
-                )
-            }
+            BottomActionBar(
+                onAddPhoto = onTakePhoto,
+                onAddText = { showAddText = true },
+                canAddText = !isSafetyWalkthrough,
+                canDictate = focusedEditableCell,
+                isDictating = isListening,
+                onDictate = {
+                    if (isListening) {
+                        speechRecognizer?.cancel()
+                        isListening = false
+                    } else if (!focusedEditableCell) {
+                        snackbarScope.launch { snackbarHostState.showSnackbar(dictationNoCellMsg) }
+                    } else if (speechRecognizer == null) {
+                        snackbarScope.launch { snackbarHostState.showSnackbar(dictationUnavailableMsg) }
+                    } else if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                        speechRecognizer.startListening(hungarianSpeechIntent())
+                    } else {
+                        permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                },
+            )
         },
     ) { padding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .imePadding(),
+                .padding(padding),
         ) {
             EditorHtmlWebView(
                 html = html,
@@ -370,6 +367,7 @@ private fun BottomActionBar(
         tonalElevation = 4.dp,
         modifier = Modifier
             .fillMaxWidth()
+            .imePadding()
             .navigationBarsPadding(),
     ) {
         Row(

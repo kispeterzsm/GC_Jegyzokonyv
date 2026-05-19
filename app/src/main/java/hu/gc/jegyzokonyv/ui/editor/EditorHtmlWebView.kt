@@ -177,13 +177,15 @@ private fun injectEditBridge(html: String): String {
             }
           }
           function scrollActiveIntoView() {
-            if (!activeEditable) return;
-            [120, 450].forEach(function(delay) {
-              window.setTimeout(function() {
-                var table = activeEditable.closest && activeEditable.closest('table');
-                (table || activeEditable).scrollIntoView({ block: table ? 'center' : 'nearest', inline: 'nearest', behavior: 'smooth' });
-              }, delay);
-            });
+            if (!activeEditable || !activeEditable.scrollIntoView) return;
+            activeEditable.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
+          }
+          function notifyEditableFocusAfterBlur() {
+            window.setTimeout(function() {
+              var focused = document.activeElement && document.activeElement.isContentEditable;
+              if (!focused) activeEditable = null;
+              notifyFocus(!!focused);
+            }, 0);
           }
           function insertText(text) {
             if (!activeEditable) return false;
@@ -205,7 +207,6 @@ private fun injectEditBridge(html: String): String {
             }
             storeSelection();
             saveNow();
-            scrollActiveIntoView();
             return true;
           }
           window.EditorCommands = {
@@ -223,7 +224,6 @@ private fun injectEditBridge(html: String): String {
             if (!event.target || !event.target.isContentEditable) return;
             activeEditable = event.target;
             storeSelection();
-            scrollActiveIntoView();
             if (timer) window.clearTimeout(timer);
             timer = window.setTimeout(saveNow, 350);
           }, true);
@@ -232,19 +232,16 @@ private fun injectEditBridge(html: String): String {
             activeEditable = event.target;
             storeSelection();
             notifyFocus(true);
-            scrollActiveIntoView();
+            window.setTimeout(scrollActiveIntoView, 250);
           }, true);
           document.addEventListener('selectionchange', storeSelection, true);
-          document.addEventListener('blur', function(event) {
+          document.addEventListener('focusout', function(event) {
             if (!event.target || !event.target.isContentEditable) return;
             storeSelection();
             if (timer) window.clearTimeout(timer);
             saveNow();
+            notifyEditableFocusAfterBlur();
           }, true);
-          if (window.visualViewport) {
-            window.visualViewport.addEventListener('resize', scrollActiveIntoView);
-            window.visualViewport.addEventListener('scroll', scrollActiveIntoView);
-          }
         })();
         </script>
     """.trimIndent()
@@ -329,7 +326,7 @@ private class DraftFileWebViewClient(
 
 private fun WebView.scrollDocumentToBottom() {
     evaluateJavascript(
-        "(function(){ function b(){ window.scrollTo({ top: Math.max(document.body.scrollHeight, document.documentElement.scrollHeight), behavior: 'smooth' }); } window.setTimeout(b,150); window.setTimeout(b,600); window.setTimeout(b,1200); })();",
+        "(function(){ function b(){ window.scrollTo(0, Math.max(document.body.scrollHeight, document.documentElement.scrollHeight)); } window.requestAnimationFrame(b); window.setTimeout(b,250); })();",
         null,
     )
 }
