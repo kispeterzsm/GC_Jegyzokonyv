@@ -190,6 +190,17 @@ class ExportPdfUseCase @Inject constructor(
                 )
             }
         }.ifEmpty { defaultCooperationActions() }
+        val checklistPages = doc.select(".safety-checklist-page").mapIndexed { pageIndex, page ->
+            val rows = page.select(".checklist-table tr.checklist-item").mapNotNull { row ->
+                val label = row.selectFirst(".checklist-label")?.wholeText()?.trim().orEmpty()
+                if (label.isBlank()) return@mapNotNull null
+                SafetyChecklistRow(
+                    label = label,
+                    value = row.selectFirst(".checklist-value")?.wholeText()?.trim().orEmpty(),
+                )
+            }
+            SafetyChecklistPage(index = page.attr("data-checklist-page").toIntOrNull() ?: pageIndex + 1, rows = rows)
+        }
         val observations = doc.select(".safety-observation").mapIndexed { index, element ->
             val table = element.selectFirst(".observation-table")
             fun field(name: String): String =
@@ -210,7 +221,7 @@ class ExportPdfUseCase @Inject constructor(
                 followUp = field("follow_up"),
             )
         }
-        return SafetyDocument(dateText = dateText, cooperationActions = cooperationActions, observations = observations)
+        return SafetyDocument(dateText = dateText, checklistPages = checklistPages, cooperationActions = cooperationActions, observations = observations)
     }
 
     private fun defaultCooperationActions(): List<SafetyCheckItem> = listOf(
@@ -295,6 +306,12 @@ class ExportPdfUseCase @Inject constructor(
             drawSafetyHeader(null)
             drawIntro()
             finishCurrentPage()
+            document.checklistPages.forEach { checklistPage ->
+                startPage()
+                drawSafetyHeader(null)
+                drawChecklistPage(checklistPage)
+                finishCurrentPage()
+            }
             document.observations.forEach { observation ->
                 startPage()
                 drawSafetyHeader("${observation.index}.")
@@ -311,6 +328,41 @@ class ExportPdfUseCase @Inject constructor(
         fun close() {
             runCatching { finishCurrentPage() }
             pdf.close()
+        }
+
+        private fun drawChecklistPage(checklistPage: SafetyChecklistPage) {
+            y += 4f
+            if (checklistPage.index == 1) {
+                val widths = floatArrayOf(135f, 170f, 65f, 160f)
+                val labels = listOf("Ellenőrzött vállalkozás:", "", "Dátum:", "")
+                var x = SAFETY_MARGIN_PT + 22f
+                labels.forEachIndexed { i, value ->
+                    drawCell(RectF(x, y, x + widths[i], y + 24f), value, if (i == 0 || i == 2) boldPaint else textPaint)
+                    x += widths[i]
+                }
+                y += 32f
+                drawText("Megfelelt: ✓     Nem felelt meg: X     Hiány: H     Nem vonatkozik: -", boldPaint, SAFETY_MARGIN_PT + 22f, y, SAFETY_WIDTH_PT - 44f)
+                y += 26f
+            }
+            drawChecklistRows(checklistPage.rows)
+            drawPageNumber()
+        }
+
+        private fun drawChecklistRows(rows: List<SafetyChecklistRow>) {
+            val left = SAFETY_MARGIN_PT + 22f
+            val labelWidth = 380f
+            val valueWidth = SAFETY_WIDTH_PT - 44f - labelWidth
+            rows.forEach { row ->
+                if (y + 22f > PAGE_BOTTOM_PT) return@forEach
+                val height = when {
+                    row.label.length > 100 -> 34f
+                    row.label.length > 58 -> 28f
+                    else -> 22f
+                }
+                drawCell(RectF(left, y, left + labelWidth, y + height), row.label, smallPaint)
+                drawCell(RectF(left + labelWidth, y, left + labelWidth + valueWidth, y + height), row.value, textPaint)
+                y += height
+            }
         }
 
         private fun drawIntro() {
@@ -863,8 +915,19 @@ class ExportPdfUseCase @Inject constructor(
 
     private data class SafetyDocument(
         val dateText: String,
+        val checklistPages: List<SafetyChecklistPage>,
         val cooperationActions: List<SafetyCheckItem>,
         val observations: List<SafetyObservation>,
+    )
+
+    private data class SafetyChecklistPage(
+        val index: Int,
+        val rows: List<SafetyChecklistRow>,
+    )
+
+    private data class SafetyChecklistRow(
+        val label: String,
+        val value: String,
     )
 
     private data class SafetyCheckItem(

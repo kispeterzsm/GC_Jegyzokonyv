@@ -127,7 +127,40 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
             """.trimIndent()
         )
         page.appendElement("div").addClass("after-risk-page-break")
+        appendSafetyChecklistPages(content)
         return render(doc)
+    }
+
+    private fun appendSafetyChecklistPages(content: org.jsoup.nodes.Element) {
+        CHECKLIST_PAGES.forEachIndexed { pageIndex, categories ->
+            val page = content.appendElement("section").addClass("safety-page").addClass("safety-checklist-page")
+            page.attr("data-checklist-page", (pageIndex + 1).toString())
+            appendSafetyHeader(page, null)
+            val body = page.appendElement("div").addClass("checklist-body")
+            if (pageIndex == 0) {
+                body.appendElement("table").addClass("checklist-meta").append(
+                    """
+                    <tr><th>Ellenőrzött vállalkozás:</th><td contenteditable="true" data-field="checked_company"></td><th>Dátum:</th><td contenteditable="true" data-field="checklist_date"></td></tr>
+                    """.trimIndent()
+                )
+                body.appendElement("p").addClass("checklist-legend").html("Megfelelt: ✓ &nbsp;&nbsp; Nem felelt meg: X &nbsp;&nbsp; Hiány: H &nbsp;&nbsp; Nem vonatkozik: -")
+            }
+            categories.forEach { category -> appendChecklistCategory(body, category) }
+        }
+    }
+
+    private fun appendChecklistCategory(parent: org.jsoup.nodes.Element, category: ChecklistCategory) {
+        val table = parent.appendElement("table").addClass("checklist-table")
+        table.appendElement("tr").addClass("checklist-category")
+            .appendElement("th").attr("colspan", "2").text(category.title)
+        category.items.forEachIndexed { index, item ->
+            val row = table.appendElement("tr").addClass("checklist-item")
+            row.appendElement("td").addClass("checklist-label").text(item)
+            row.appendElement("td")
+                .addClass("checklist-value")
+                .attr("contenteditable", "true")
+                .attr("data-field", "${category.id}_$index")
+        }
     }
 
     private fun appendSafetyObservation(doc: Document, relativeImagePath: String) {
@@ -261,6 +294,15 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
               .cooperation-actions { width: 100%; margin: 8px 0 12px; border-collapse: collapse; table-layout: fixed; }
               .cooperation-actions td { border: 1px solid #000; padding: 3px 6px; vertical-align: top; }
               .cooperation-actions .check-cell { width: 42px; text-align: center; font-weight: bold; cursor: pointer; user-select: none; }
+              .checklist-body { margin: 0 22px; font-size: 12px; line-height: 1.15; }
+              .checklist-meta, .checklist-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin: 0 0 6px; }
+              .checklist-meta th, .checklist-meta td, .checklist-table th, .checklist-table td { border: 1px solid #000; padding: 2px 5px; vertical-align: top; }
+              .checklist-meta th { width: 22%; text-align: left; }
+              .checklist-meta td { width: 28%; min-height: 20px; }
+              .checklist-legend { margin: 4px 0 8px; font-weight: bold; }
+              .checklist-category th { background: #e9e9e9; text-align: left; font-weight: bold; }
+              .checklist-label { width: 72%; }
+              .checklist-value { width: 28%; min-height: 18px; white-space: pre-wrap; overflow-wrap: anywhere; }
               .risk-matrix, .risk-levels, .observation-table { width: 92%; margin: 12px auto 0; border-collapse: collapse; table-layout: fixed; }
               .risk-matrix th, .risk-matrix td, .risk-levels th, .risk-levels td, .observation-table th, .observation-table td { border: 1px solid #000; padding: 2px 6px; vertical-align: top; }
               .risk-matrix th { text-align: left; font-weight: normal; }
@@ -284,6 +326,8 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
                 .safety-header { margin-bottom: 8px; }
                 .safety-header th { font-size: 13px; padding: 3px 4px; }
                 .intro-body { margin: 0 16px; font-size: 14px; }
+                .checklist-body { margin: 0 6px; font-size: 10px; }
+                .checklist-meta th, .checklist-meta td, .checklist-table th, .checklist-table td { padding: 2px 3px; }
                 .risk-matrix, .risk-levels, .observation-body { width: 100%; }
                 .observation-image { max-height: 26vh; margin-bottom: 6px; }
                 .observation-image-preview { height: 26vh; min-height: 140px; }
@@ -301,8 +345,107 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
         """.trimIndent()
     }
 
+    private data class ChecklistCategory(
+        val id: String,
+        val title: String,
+        val items: List<String>,
+    )
+
     private companion object {
         const val CONTENT_ID = "content"
         const val SAFETY_CLASS = "safety-walkthrough"
+
+        val CHECKLIST_PAGES = listOf(
+            listOf(
+                ChecklistCategory(
+                    id = "documentation",
+                    title = "Dokumentációk megléte",
+                    items = listOf(
+                        "kockázatértékelés",
+                        "engedély",
+                        "hegesztés, nyílt láng, szikra",
+                        "földmunka",
+                        "szűk-zárt tér",
+                        "visszabontás",
+                        "Biztonsági terv: munkagödör omlásbiztosítása",
+                        "szűk-zárt térben való munkavégzés",
+                        "épületszerkezet visszabontása",
+                        "zsaluzatok bontása",
+                        "több emelőgéppel végzett együttes emelés",
+                        "munkavédelmi üzembe helyezés: veszélyes munkaeszköz",
+                        "emelőgép",
+                        "alpin-technika",
+                        "használatba vételi eljárás",
+                        "ideiglenes energiaelosztó hálózat",
+                        "össze- és szétszerelhető munkaeszközök",
+                        "állvány",
+                        "felülvizsgálatok",
+                        "elektromos kéziszerszám szerelői ellenőrzése",
+                        "ÁVK havonta",
+                        "tűzoltó készülék üzemeltetési napló",
+                        "homlokzati állványzat, akna állványzata",
+                        "mobil állvány",
+                        "létra",
+                        "egyéb ideiglenes felépítmények",
+                        "nyilvántartások: EVE átvétel, területre vonatkozó oktatási napló, veszélyes anyagok",
+                        "emelő- és munkagépek gépnaplója, felülvizsgálati jegyzőkönyvek",
+                        "technológiai utasítás",
+                    ),
+                ),
+                ChecklistCategory(
+                    id = "personnel",
+                    title = "Személyi feltételek ellenőrzése",
+                    items = listOf(
+                        "képzettség (bizonyítvány, igazolvány, jogosítvány, tűzvédelmi szakvizsga)",
+                        "orvosi alkalmasság",
+                        "fizikai, gyakorlati alkalmasság, megfelelő létszám",
+                        "kockázatok ismerete, oktatás a megelőzésről",
+                        "soron kívüli oktatás",
+                        "állvány építése és bontása",
+                        "személyek emelésére alkalmas emelőgép használata",
+                        "zuhanásgátló heveder alkalmazása",
+                        "emelőgép kezelése",
+                        "daruirányítás, teherkötözés",
+                        "hegesztés fokozottan veszélyes körülmények között",
+                        "technológiai művelet",
+                        "ideiglenes munkairányítás",
+                        "szűk-zárt tér",
+                        "munkairányító kinevezése",
+                    ),
+                ),
+            ),
+            listOf(
+                ChecklistCategory(
+                    id = "equipment",
+                    title = "Tárgyi feltételek",
+                    items = listOf(
+                        "kollektív és megfelelő egyéni védőeszközök",
+                        "ép szerszámok és eszközök",
+                        "szabványos állványok és létrák, feljárók, átjárók állapota",
+                        "dúcolatok",
+                        "függesztékek állapota",
+                        "elsősegély doboz a helyszínen",
+                        "tűzoltó készülék",
+                        "munkakörnyezeti tényezők: megvilágítás, fűtés, szellőzés, hozzáférés, villamos biztonság, közlekedés, veszélyes anyagok kezelése, zaj, rezgés, por, stabilitás",
+                    ),
+                ),
+                ChecklistCategory(
+                    id = "organization",
+                    title = "Szervezési feltételek",
+                    items = listOf(
+                        "munkaterület átvétele, lehatárolása",
+                        "közlekedési útvonal biztosítása",
+                        "anyagmozgatás irányítása",
+                        "rend, fegyelem, tisztaság",
+                        "dohányzás",
+                        "tűzvédelmi előírások betartása",
+                        "konzultáció",
+                        "védőital, pihenőidő",
+                        "anyag és hulladéktárolás kialakítása",
+                        "veszélyes anyagok, gázpalackok kezelése",
+                    ),
+                ),
+            ),
+        )
     }
 }
