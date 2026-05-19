@@ -191,7 +191,7 @@ class ExportPdfUseCase @Inject constructor(
             }
         }.ifEmpty { defaultCooperationActions() }
         val checklistPages = doc.select(".safety-checklist-page").mapIndexed { pageIndex, page ->
-            val rows = page.select(".checklist-table tr.checklist-item").mapNotNull { row ->
+            val rawRows = page.select(".checklist-table tr.checklist-item").mapNotNull { row ->
                 val label = row.selectFirst(".checklist-label")?.wholeText()?.trim().orEmpty()
                 if (label.isBlank()) return@mapNotNull null
                 SafetyChecklistRow(
@@ -201,7 +201,7 @@ class ExportPdfUseCase @Inject constructor(
                     group = row.hasClass("checklist-group"),
                 )
             }
-            SafetyChecklistPage(index = page.attr("data-checklist-page").toIntOrNull() ?: pageIndex + 1, rows = rows)
+            SafetyChecklistPage(index = page.attr("data-checklist-page").toIntOrNull() ?: pageIndex + 1, rows = filterEmptyChecklistRows(rawRows))
         }
         val observations = doc.select(".safety-observation").mapIndexed { index, element ->
             val table = element.selectFirst(".observation-table")
@@ -249,6 +249,30 @@ class ExportPdfUseCase @Inject constructor(
             throw error
         } finally {
             renderer.close()
+        }
+    }
+
+    private fun filterEmptyChecklistRows(rows: List<SafetyChecklistRow>): List<SafetyChecklistRow> = buildList {
+        var index = 0
+        while (index < rows.size) {
+            val row = rows[index]
+            if (row.group) {
+                val childRows = mutableListOf<SafetyChecklistRow>()
+                var childIndex = index + 1
+                while (childIndex < rows.size && rows[childIndex].indented) {
+                    val child = rows[childIndex]
+                    if (child.value.isNotBlank()) childRows.add(child)
+                    childIndex++
+                }
+                if (childRows.isNotEmpty()) {
+                    add(row)
+                    addAll(childRows)
+                }
+                index = childIndex
+            } else {
+                if (row.value.isNotBlank()) add(row)
+                index++
+            }
         }
     }
 
