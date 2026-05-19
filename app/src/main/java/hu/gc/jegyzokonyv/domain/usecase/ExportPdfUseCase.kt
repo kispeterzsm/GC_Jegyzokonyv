@@ -172,6 +172,24 @@ class ExportPdfUseCase @Inject constructor(
             ?.trim()
             ?.ifBlank { null }
             ?: ""
+        val cooperationActions = doc.select(".cooperation-actions tr").mapNotNull { row ->
+            val cells = row.select("td")
+            if (cells.size < 2) return@mapNotNull null
+            SafetyCheckItem(
+                mark = cells[0].wholeText().trim().ifBlank { "X" },
+                text = cells[1].wholeText().trim(),
+            )
+        }.ifEmpty {
+            doc.select(".intro-body li").mapNotNull { item ->
+                val whole = item.wholeText().trim()
+                if (whole.isBlank()) return@mapNotNull null
+                val mark = if (whole.endsWith("✓")) "✓" else "X"
+                SafetyCheckItem(
+                    mark = mark,
+                    text = whole.removeSuffix("✓").removeSuffix("X").trim(),
+                )
+            }
+        }.ifEmpty { defaultCooperationActions() }
         val observations = doc.select(".safety-observation").mapIndexed { index, element ->
             val table = element.selectFirst(".observation-table")
             fun field(name: String): String =
@@ -192,8 +210,17 @@ class ExportPdfUseCase @Inject constructor(
                 followUp = field("follow_up"),
             )
         }
-        return SafetyDocument(dateText = dateText, observations = observations)
+        return SafetyDocument(dateText = dateText, cooperationActions = cooperationActions, observations = observations)
     }
+
+    private fun defaultCooperationActions(): List<SafetyCheckItem> = listOf(
+        SafetyCheckItem("X", "beléptetés megoldása"),
+        SafetyCheckItem("X", "generálkivitelező FMV a helyszínen"),
+        SafetyCheckItem("X", "BEK bejárás heti 1 alkalommal"),
+        SafetyCheckItem("X", "ellenőrzési tapasztalatok megküldése és a megelőzés számonkérése"),
+        SafetyCheckItem("X", "különböző munkáltatók tevékenységének összehangolása építésvezetői közreműködéssel"),
+        SafetyCheckItem("X", "napi tájékoztatók"),
+    )
 
     private fun renderSafetyPdf(document: SafetyDocument, output: File): ExportStats {
         output.parentFile?.mkdirs()
@@ -298,18 +325,8 @@ class ExportPdfUseCase @Inject constructor(
             y += 28f
             drawText("Az együttműködés előmozdítása érdekében tett intézkedések", boldPaint, SAFETY_MARGIN_PT + 22f, y, SAFETY_WIDTH_PT - 44f)
             y += 26f
-            listOf(
-                "beléptetés megoldása ✓",
-                "generálkivitelező FMV a helyszínen ✓",
-                "BEK bejárás heti 1 alkalommal ✓",
-                "ellenőrzési tapasztalatok megküldése és a megelőzés számonkérése ✓",
-                "különböző munkáltatók tevékenységének összehangolása építésvezetői közreműködéssel ✓",
-                "napi tájékoztatók ✓",
-            ).forEach {
-                drawText("-   $it", textPaint, SAFETY_MARGIN_PT + 40f, y, SAFETY_WIDTH_PT - 80f)
-                y += if (it.length > 70) 32f else 18f
-            }
-            y += 8f
+            drawCooperationActions()
+            y += 12f
             drawText("Munkaterület állapota a mai napon", boldPaint, SAFETY_MARGIN_PT + 22f, y, SAFETY_WIDTH_PT - 44f)
             y += 28f
             drawText("Értékelés módja kockázat alapú:", textPaint, SAFETY_MARGIN_PT + 22f, y, SAFETY_WIDTH_PT - 44f)
@@ -318,6 +335,22 @@ class ExportPdfUseCase @Inject constructor(
             y += 24f
             drawRiskLevels()
             drawPageNumber()
+        }
+
+        private fun drawCooperationActions() {
+            val left = SAFETY_MARGIN_PT + 40f
+            val widths = floatArrayOf(42f, SAFETY_WIDTH_PT - 102f)
+            val rowHeights = document.cooperationActions.map { item ->
+                if (item.text.length > 70) 34f else 22f
+            }
+            document.cooperationActions.forEachIndexed { index, item ->
+                var x = left
+                val height = rowHeights[index]
+                drawCell(RectF(x, y, x + widths[0], y + height), item.mark, boldPaint, center = true)
+                x += widths[0]
+                drawCell(RectF(x, y, x + widths[1], y + height), item.text, textPaint)
+                y += height
+            }
         }
 
         private fun drawRiskMatrix() {
@@ -422,11 +455,8 @@ class ExportPdfUseCase @Inject constructor(
             row("veszély forrása", observation.hazardSource, 38f)
             row("veszélyhelyzet", observation.hazardSituation, 48f)
             row("megelőzés", observation.prevention, 90f)
-            drawCell(RectF(left, y, left + labelWidth, y + 38f), "határidő", boldPaint)
-            drawCell(RectF(left + labelWidth, y, left + labelWidth + 150f, y + 38f), observation.deadline, textPaint)
-            drawCell(RectF(left + labelWidth + 150f, y, left + labelWidth + 205f, y + 38f), "felelős", textPaint, center = true)
-            drawCell(RectF(left + labelWidth + 205f, y, left + labelWidth + valueWidth, y + 38f), observation.responsible, textPaint)
-            y += 38f
+            row("határidő", observation.deadline, 32f)
+            row("felelős", observation.responsible, 32f)
             row("szankció", observation.sanction, 28f)
             row("visszaellenőrzés", observation.followUp, 44f)
         }
@@ -833,7 +863,13 @@ class ExportPdfUseCase @Inject constructor(
 
     private data class SafetyDocument(
         val dateText: String,
+        val cooperationActions: List<SafetyCheckItem>,
         val observations: List<SafetyObservation>,
+    )
+
+    private data class SafetyCheckItem(
+        val mark: String,
+        val text: String,
     )
 
     private data class SafetyObservation(

@@ -95,14 +95,14 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
               <p class="inspection-row"><strong>Az ellenőrzést végezte:</strong> <strong>Kispéter Ákosné</strong> <strong>Dátum: ${formatHungarianDate(todayIso)}</strong></p>
               <p>Megfelelt: ✓ <span>Nem felelt meg: X</span></p>
               <p><strong>Az együttműködés előmozdítása érdekében tett intézkedések</strong></p>
-              <ul>
-                <li>beléptetés megoldása ✓</li>
-                <li>generálkivitelező FMV a helyszínen ✓</li>
-                <li>BEK bejárás heti 1 alkalommal ✓</li>
-                <li>ellenőrzési tapasztalatok megküldése és a megelőzés számonkérése ✓</li>
-                <li>különböző munkáltatók tevékenységének összehangolása építésvezetői közreműködéssel ✓</li>
-                <li>napi tájékoztatók ✓</li>
-              </ul>
+              <table class="cooperation-actions">
+                <tr><td class="check-cell" data-toggle-check="true">X</td><td>beléptetés megoldása</td></tr>
+                <tr><td class="check-cell" data-toggle-check="true">X</td><td>generálkivitelező FMV a helyszínen</td></tr>
+                <tr><td class="check-cell" data-toggle-check="true">X</td><td>BEK bejárás heti 1 alkalommal</td></tr>
+                <tr><td class="check-cell" data-toggle-check="true">X</td><td>ellenőrzési tapasztalatok megküldése és a megelőzés számonkérése</td></tr>
+                <tr><td class="check-cell" data-toggle-check="true">X</td><td>különböző munkáltatók tevékenységének összehangolása építésvezetői közreműködéssel</td></tr>
+                <tr><td class="check-cell" data-toggle-check="true">X</td><td>napi tájékoztatók</td></tr>
+              </table>
               <p><strong>Munkaterület állapota a mai napon</strong></p>
               <p>Értékelés módja kockázat alapú:</p>
             </div>
@@ -145,7 +145,8 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
             <tr><th>veszély forrása</th><td colspan="2" contenteditable="true" data-field="hazard_source"></td></tr>
             <tr><th>veszélyhelyzet</th><td colspan="2" contenteditable="true" data-field="hazard_situation"></td></tr>
             <tr><th>megelőzés</th><td colspan="2" contenteditable="true" data-field="prevention"></td></tr>
-            <tr><th>határidő</th><td contenteditable="true" data-field="deadline"></td><td><span>felelős</span> <span contenteditable="true" data-field="responsible"></span></td></tr>
+            <tr><th>határidő</th><td colspan="2" contenteditable="true" data-field="deadline"></td></tr>
+            <tr><th>felelős</th><td colspan="2" contenteditable="true" data-field="responsible"></td></tr>
             <tr><th>szankció</th><td colspan="2" contenteditable="true" data-field="sanction"></td></tr>
             <tr><th>visszaellenőrzés</th><td colspan="2" contenteditable="true" data-field="follow_up"></td></tr>
             """.trimIndent()
@@ -249,7 +250,7 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
               body.safety-walkthrough { margin: 0; background: #fff; color: #000; font-family: serif; font-size: 14px; }
               #content { width: 100%; }
               .safety-page { width: 100%; min-height: 100vh; padding: 24px; page-break-after: always; }
-              .safety-header { width: 100%; border-collapse: collapse; margin: 0 0 18px; table-layout: fixed; }
+              .safety-header { width: 100%; border-collapse: collapse; margin: 0 0 14px; table-layout: fixed; }
               .safety-header th { border: 1px solid #000; background: #e9e9e9; font-size: 18px; line-height: 1.2; text-align: center; padding: 4px 6px; }
               .safety-header th:first-child { width: 25%; }
               .safety-header th:nth-child(2) { width: 47%; }
@@ -257,7 +258,9 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
               .safety-header .page-index { width: 6%; }
               .intro-body { margin: 0 36px; font-size: 18px; line-height: 1.25; }
               .inspection-row { display: flex; justify-content: space-between; gap: 24px; }
-              .intro-body ul { margin-top: 8px; }
+              .cooperation-actions { width: 100%; margin: 8px 0 12px; border-collapse: collapse; table-layout: fixed; }
+              .cooperation-actions td { border: 1px solid #000; padding: 3px 6px; vertical-align: top; }
+              .cooperation-actions .check-cell { width: 42px; text-align: center; font-weight: bold; cursor: pointer; user-select: none; }
               .risk-matrix, .risk-levels, .observation-table { width: 92%; margin: 12px auto 0; border-collapse: collapse; table-layout: fixed; }
               .risk-matrix th, .risk-matrix td, .risk-levels th, .risk-levels td, .observation-table th, .observation-table td { border: 1px solid #000; padding: 2px 6px; vertical-align: top; }
               .risk-matrix th { text-align: left; font-weight: normal; }
@@ -268,12 +271,26 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
               .high { background: #ff0000; color: #000; }
               .after-risk-page-break { page-break-after: always; break-after: page; height: 0; }
               .observation-body { width: 92%; margin: 0 auto; }
-              .observation-image { width: 100%; max-height: 48vh; object-fit: contain; display: block; margin: 0 auto 10px; }
-              .observation-table { width: 100%; margin-top: 0; font-size: 16px; }
-              .observation-table th { width: 28%; }
+              .observation-image { width: 100%; height: auto; max-height: 34vh; object-fit: contain; display: block; margin: 0 auto 8px; border: 1px solid #000; background: #f3f3f3; }
+              .observation-image-preview { height: 34vh; min-height: 180px; background-size: contain; background-repeat: no-repeat; background-position: center; }
+              .observation-table { width: 100%; margin-top: 0; font-size: 14px; }
+              .observation-table th { width: 26%; }
               .observation-table td { min-height: 24px; white-space: pre-wrap; overflow-wrap: anywhere; }
-              [contenteditable="true"] { min-height: 20px; outline: 1px dashed transparent; }
-              [contenteditable="true"]:focus { outline-color: #777; background: #fffde7; }
+              [contenteditable="true"] { min-height: 20px; outline: 1px dashed transparent; scroll-margin: 96px 0 24px; }
+              [contenteditable="true"]:focus { outline-color: #555; background: #fffde7; }
+              @media screen {
+                body.safety-walkthrough { font-size: 10px; }
+                .safety-page { min-height: auto; padding: 12px 8px 18px; }
+                .safety-header { margin-bottom: 8px; }
+                .safety-header th { font-size: 13px; padding: 3px 4px; }
+                .intro-body { margin: 0 16px; font-size: 14px; }
+                .risk-matrix, .risk-levels, .observation-body { width: 100%; }
+                .observation-image { max-height: 26vh; margin-bottom: 6px; }
+                .observation-image-preview { height: 26vh; min-height: 140px; }
+                .observation-table { font-size: 12px; }
+                .observation-table th { width: 25%; }
+                .observation-table th, .observation-table td { padding: 2px 4px; }
+              }
             </style>
             </head>
             <body class="safety-walkthrough">

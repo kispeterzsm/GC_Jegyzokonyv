@@ -45,6 +45,12 @@
 
     <string name="editor_add_photo">Fotó hozzáadása</string>
     <string name="editor_add_text">Szöveg hozzáadása</string>
+    <string name="editor_dictate">Diktálás</string>
+    <string name="editor_dictation_listening">Hallgatózás…</string>
+    <string name="editor_dictation_no_cell">Először érints meg egy szerkeszthető cellát.</string>
+    <string name="editor_dictation_unavailable">Az eszközön nem érhető el offline magyar beszédfelismerés.</string>
+    <string name="editor_dictation_permission">A diktáláshoz mikrofonengedély szükséges.</string>
+    <string name="editor_dictation_failed">A diktálás nem sikerült.</string>
     <string name="editor_export_pdf">Exportálás PDF-be</string>
     <string name="editor_share_pdf">PDF megosztása</string>
     <string name="editor_title_hint">Cím</string>
