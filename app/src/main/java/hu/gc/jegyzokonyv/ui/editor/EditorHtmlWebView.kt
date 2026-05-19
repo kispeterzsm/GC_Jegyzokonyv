@@ -1,6 +1,10 @@
 package hu.gc.jegyzokonyv.ui.editor
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.graphics.Matrix
+import android.media.ExifInterface
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -123,6 +127,19 @@ private fun injectEditBridge(html: String): String {
               margin: 0 auto 6px !important;
               border: 1px solid #000 !important;
               background: #f3f3f3 !important;
+            }
+            body.safety-walkthrough .observation-image-preview {
+              display: block !important;
+              width: 100% !important;
+              height: 26vh !important;
+              min-height: 140px !important;
+              max-height: none !important;
+              margin: 0 auto 6px !important;
+              border: 1px solid #000 !important;
+              background-color: #f3f3f3 !important;
+              background-size: contain !important;
+              background-repeat: no-repeat !important;
+              background-position: center !important;
             }
             body.safety-walkthrough .observation-table { font-size: 12px !important; }
             body.safety-walkthrough .observation-table th { width: 25% !important; }
@@ -264,6 +281,9 @@ private fun embedDraftImages(html: String, draftDir: File): String {
             ?.get(1)
             .orEmpty()
         val className = originalClass.ifBlank { "observation-image" }
+        if (className.split(Regex("\\s+")).contains("observation-image")) {
+            return@replace """<div class="observation-image-preview" style="background-image:url($dataUri)" data-editor-image-preview="true" data-relative-src="$src" data-original-class="$className"></div>"""
+        }
 
         """<img class="$className" src="$dataUri" data-relative-src="$src">"""
     }
@@ -286,9 +306,88 @@ private fun resolveDraftImage(draftDir: File, src: String): File? {
 
 private fun previewDataUri(image: File): String? =
     runCatching {
-        val mimeType = image.imageMimeType() ?: "image/jpeg"
-        "data:$mimeType;base64," + Base64.encodeToString(image.readBytes(), Base64.NO_WRAP)
+        val previewBytes = image.previewJpegBytes()
+        val (mimeType, bytes) = if (previewBytes != null) {
+            "image/jpeg" to previewBytes
+        } else {
+            (image.imageMimeType() ?: "image/jpeg") to image.readBytes()
+        }
+        "data:$mimeType;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
     }.getOrNull()
+
+private fun File.previewJpegBytes(): ByteArray? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(absolutePath, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+    val sampleSize = calculateInSampleSize(bounds.outWidth, bounds.outHeight, MAX_PREVIEW_IMAGE_SIDE)
+    val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+    val decoded = BitmapFactory.decodeFile(absolutePath, options) ?: return null
+    val oriented = decoded.applyExifOrientation(readExifOrientation())
+    if (oriented !== decoded) decoded.recycle()
+
+    val scaled = oriented.scaleDown(MAX_PREVIEW_IMAGE_SIDE)
+    if (scaled !== oriented) oriented.recycle()
+
+    return java.io.ByteArrayOutputStream().use { output ->
+        scaled.compress(Bitmap.CompressFormat.JPEG, PREVIEW_JPEG_QUALITY, output)
+        if (!scaled.isRecycled) scaled.recycle()
+        output.toByteArray()
+    }
+}
+
+private fun calculateInSampleSize(width: Int, height: Int, maxSide: Int): Int {
+    var sampleSize = 1
+    var sampledWidth = width
+    var sampledHeight = height
+    while (sampledWidth / 2 >= maxSide || sampledHeight / 2 >= maxSide) {
+        sampleSize *= 2
+        sampledWidth /= 2
+        sampledHeight /= 2
+    }
+    return sampleSize
+}
+
+private fun Bitmap.scaleDown(maxSide: Int): Bitmap {
+    val longestSide = maxOf(width, height)
+    if (longestSide <= maxSide) return this
+    val scale = maxSide.toFloat() / longestSide.toFloat()
+    val targetWidth = (width * scale).toInt().coerceAtLeast(1)
+    val targetHeight = (height * scale).toInt().coerceAtLeast(1)
+    return Bitmap.createScaledBitmap(this, targetWidth, targetHeight, true)
+}
+
+private fun File.readExifOrientation(): Int =
+    runCatching {
+        ExifInterface(absolutePath).getAttributeInt(
+            ExifInterface.TAG_ORIENTATION,
+            ExifInterface.ORIENTATION_NORMAL,
+        )
+    }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
+
+private fun Bitmap.applyExifOrientation(orientation: Int): Bitmap {
+    val matrix = Matrix()
+    when (orientation) {
+        ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.setScale(-1f, 1f)
+        ExifInterface.ORIENTATION_ROTATE_180 -> matrix.setRotate(180f)
+        ExifInterface.ORIENTATION_FLIP_VERTICAL -> {
+            matrix.setRotate(180f)
+            matrix.postScale(-1f, 1f)
+        }
+        ExifInterface.ORIENTATION_TRANSPOSE -> {
+            matrix.setRotate(90f)
+            matrix.postScale(-1f, 1f)
+        }
+        ExifInterface.ORIENTATION_ROTATE_90 -> matrix.setRotate(90f)
+        ExifInterface.ORIENTATION_TRANSVERSE -> {
+            matrix.setRotate(-90f)
+            matrix.postScale(-1f, 1f)
+        }
+        ExifInterface.ORIENTATION_ROTATE_270 -> matrix.setRotate(-90f)
+        else -> return this
+    }
+    return runCatching { Bitmap.createBitmap(this, 0, 0, width, height, matrix, true) }.getOrDefault(this)
+}
 
 private fun isRelativeDraftImage(src: String): Boolean =
     src.isNotBlank() &&
@@ -348,3 +447,5 @@ private const val DICTATION_TOKEN_TAG = 0x55443323
 private const val SCROLL_TO_BOTTOM_TOKEN_TAG = 0x55443324
 private const val SCROLL_TO_BOTTOM_AFTER_LOAD_TAG = 0x55443325
 private const val SCROLL_TO_BOTTOM_PENDING_TOKEN_TAG = 0x55443326
+private const val MAX_PREVIEW_IMAGE_SIDE = 1600
+private const val PREVIEW_JPEG_QUALITY = 82
