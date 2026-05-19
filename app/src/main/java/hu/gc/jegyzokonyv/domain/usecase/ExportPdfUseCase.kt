@@ -197,6 +197,8 @@ class ExportPdfUseCase @Inject constructor(
                 SafetyChecklistRow(
                     label = label,
                     value = row.selectFirst(".checklist-value")?.wholeText()?.trim().orEmpty(),
+                    indented = row.hasClass("checklist-indent"),
+                    group = row.hasClass("checklist-group"),
                 )
             }
             SafetyChecklistPage(index = page.attr("data-checklist-page").toIntOrNull() ?: pageIndex + 1, rows = rows)
@@ -332,18 +334,6 @@ class ExportPdfUseCase @Inject constructor(
 
         private fun drawChecklistPage(checklistPage: SafetyChecklistPage) {
             y += 4f
-            if (checklistPage.index == 1) {
-                val widths = floatArrayOf(135f, 170f, 65f, 160f)
-                val labels = listOf("Ellenőrzött vállalkozás:", "", "Dátum:", "")
-                var x = SAFETY_MARGIN_PT + 22f
-                labels.forEachIndexed { i, value ->
-                    drawCell(RectF(x, y, x + widths[i], y + 24f), value, if (i == 0 || i == 2) boldPaint else textPaint)
-                    x += widths[i]
-                }
-                y += 32f
-                drawText("Megfelelt: ✓     Nem felelt meg: X     Hiány: H     Nem vonatkozik: -", boldPaint, SAFETY_MARGIN_PT + 22f, y, SAFETY_WIDTH_PT - 44f)
-                y += 26f
-            }
             drawChecklistRows(checklistPage.rows)
             drawPageNumber()
         }
@@ -359,8 +349,12 @@ class ExportPdfUseCase @Inject constructor(
                     row.label.length > 58 -> 28f
                     else -> 22f
                 }
-                drawCell(RectF(left, y, left + labelWidth, y + height), row.label, smallPaint)
-                drawCell(RectF(left + labelWidth, y, left + labelWidth + valueWidth, y + height), row.value, textPaint)
+                if (row.group) {
+                    drawCell(RectF(left, y, left + labelWidth + valueWidth, y + height), row.label, smallPaint, fill = Color.rgb(232, 232, 232))
+                } else {
+                    drawCell(RectF(left, y, left + labelWidth, y + height), row.label, smallPaint, textInset = if (row.indented) 24f else 4f)
+                    drawCell(RectF(left + labelWidth, y, left + labelWidth + valueWidth, y + height), row.value, textPaint)
+                }
                 y += height
             }
         }
@@ -538,15 +532,16 @@ class ExportPdfUseCase @Inject constructor(
             paint: TextPaint,
             fill: Int = Color.WHITE,
             center: Boolean = false,
+            textInset: Float = 4f,
         ) {
             fillPaint.color = fill
             canvas.drawRect(rect, fillPaint)
             canvas.drawRect(rect, borderPaint)
-            val layout = staticLayout(text, paint, (rect.width() - 8f).roundToInt().coerceAtLeast(1))
+            val layout = staticLayout(text, paint, (rect.width() - textInset - 4f).roundToInt().coerceAtLeast(1))
             val textY = if (center) rect.top + ((rect.height() - layout.height) / 2f).coerceAtLeast(2f) else rect.top + 3f
             canvas.save()
             canvas.clipRect(rect)
-            canvas.translate(rect.left + 4f, textY)
+            canvas.translate(rect.left + textInset, textY)
             layout.draw(canvas)
             canvas.restore()
         }
@@ -928,6 +923,8 @@ class ExportPdfUseCase @Inject constructor(
     private data class SafetyChecklistRow(
         val label: String,
         val value: String,
+        val indented: Boolean,
+        val group: Boolean,
     )
 
     private data class SafetyCheckItem(

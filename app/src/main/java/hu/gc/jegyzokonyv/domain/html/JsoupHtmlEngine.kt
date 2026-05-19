@@ -137,14 +137,6 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
             page.attr("data-checklist-page", (pageIndex + 1).toString())
             appendSafetyHeader(page, null)
             val body = page.appendElement("div").addClass("checklist-body")
-            if (pageIndex == 0) {
-                body.appendElement("table").addClass("checklist-meta").append(
-                    """
-                    <tr><th>Ellenőrzött vállalkozás:</th><td contenteditable="true" data-field="checked_company"></td><th>Dátum:</th><td contenteditable="true" data-field="checklist_date"></td></tr>
-                    """.trimIndent()
-                )
-                body.appendElement("p").addClass("checklist-legend").html("Megfelelt: ✓ &nbsp;&nbsp; Nem felelt meg: X &nbsp;&nbsp; Hiány: H &nbsp;&nbsp; Nem vonatkozik: -")
-            }
             categories.forEach { category -> appendChecklistCategory(body, category) }
         }
     }
@@ -154,12 +146,28 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
         table.appendElement("tr").addClass("checklist-category")
             .appendElement("th").attr("colspan", "2").text(category.title)
         category.items.forEachIndexed { index, item ->
+            val isIndented = isIndentedChecklistItem(category.id, item)
+            val isGroupRow = !isIndented && category.items.getOrNull(index + 1)?.let { next ->
+                isIndentedChecklistItem(category.id, next)
+            } == true
             val row = table.appendElement("tr").addClass("checklist-item")
-            row.appendElement("td").addClass("checklist-label").text(item)
-            row.appendElement("td")
-                .addClass("checklist-value")
-                .attr("contenteditable", "true")
-                .attr("data-field", "${category.id}_$index")
+            when {
+                isGroupRow -> {
+                    row.addClass("checklist-group")
+                    row.appendElement("td")
+                        .addClass("checklist-label")
+                        .attr("colspan", "2")
+                        .text(item)
+                }
+                else -> {
+                    if (isIndented) row.addClass("checklist-indent")
+                    row.appendElement("td").addClass("checklist-label").text(item)
+                    row.appendElement("td")
+                        .addClass("checklist-value")
+                        .attr("contenteditable", "true")
+                        .attr("data-field", "${category.id}_$index")
+                }
+            }
         }
     }
 
@@ -302,6 +310,8 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
               .checklist-legend { margin: 4px 0 8px; font-weight: bold; }
               .checklist-category th { background: #e9e9e9; text-align: left; font-weight: bold; }
               .checklist-label { width: 72%; }
+              .checklist-group .checklist-label { width: 100%; background: #e9e9e9; font-weight: normal; }
+              .checklist-indent .checklist-label { padding-left: 22px; }
               .checklist-value { width: 28%; min-height: 18px; white-space: pre-wrap; overflow-wrap: anywhere; }
               .risk-matrix, .risk-levels, .observation-table { width: 92%; margin: 12px auto 0; border-collapse: collapse; table-layout: fixed; }
               .risk-matrix th, .risk-matrix td, .risk-levels th, .risk-levels td, .observation-table th, .observation-table td { border: 1px solid #000; padding: 2px 6px; vertical-align: top; }
@@ -345,6 +355,9 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
         """.trimIndent()
     }
 
+    private fun isIndentedChecklistItem(_categoryId: String, item: String): Boolean =
+        item.trim() in INDENTED_CHECKLIST_ITEMS
+
     private data class ChecklistCategory(
         val id: String,
         val title: String,
@@ -354,6 +367,33 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
     private companion object {
         const val CONTENT_ID = "content"
         const val SAFETY_CLASS = "safety-walkthrough"
+
+        val INDENTED_CHECKLIST_ITEMS = setOf(
+            "hegesztés, nyílt láng, szikra",
+            "földmunka",
+            "szűk-zárt tér",
+            "visszabontás",
+            "munkagödör omlásbiztosítása",
+            "szűk-zárt térben való munkavégzés",
+            "épületszerkezet visszabontása",
+            "zsaluzatok bontása",
+            "több emelőgéppel végzett együttes emelés",
+            "veszélyes munkaeszköz",
+            "emelőgép",
+            "alpin-technika",
+            "használatba vételi eljárás",
+            "ideiglenes energiaelosztó hálózat",
+            "össze- és szétszerelhető munkaeszközök",
+            "állvány",
+            "állvány építése és bontása",
+            "személyek emelésére alkalmas emelőgép használata",
+            "zuhanásgátló heveder alkalmazása",
+            "emelőgép kezelése",
+            "daruirányítás, teherkötözés",
+            "hegesztés fokozottan veszélyes körülmények között",
+            "technológiai művelet",
+            "ideiglenes munkairányítás",
+        )
 
         val CHECKLIST_PAGES = listOf(
             listOf(
@@ -367,12 +407,14 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
                         "földmunka",
                         "szűk-zárt tér",
                         "visszabontás",
-                        "Biztonsági terv: munkagödör omlásbiztosítása",
+                        "Biztonsági terv: ",
+                        "munkagödör omlásbiztosítása",
                         "szűk-zárt térben való munkavégzés",
                         "épületszerkezet visszabontása",
                         "zsaluzatok bontása",
                         "több emelőgéppel végzett együttes emelés",
-                        "munkavédelmi üzembe helyezés: veszélyes munkaeszköz",
+                        "munkavédelmi üzembe helyezés",
+                        "veszélyes munkaeszköz",
                         "emelőgép",
                         "alpin-technika",
                         "használatba vételi eljárás",
