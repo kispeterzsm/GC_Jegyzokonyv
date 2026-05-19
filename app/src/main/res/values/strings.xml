@@ -5,6 +5,18 @@
     <string name="home_title">Jegyzőkönyvek</string>
     <string name="home_empty">Még nincs egyetlen jegyzőkönyv sem.\nÉrintsd meg a + gombot az új jegyzőkönyv indításához.</string>
     <string name="home_new_draft">Új jegyzőkönyv</string>
+    <string name="home_check_update">Frissítés</string>
+    <string name="update_checking">Frissítés keresése…</string>
+    <string name="update_downloading">Frissítés letöltése…</string>
+    <string name="update_available_title">Új verzió érhető el</string>
+    <string name="update_available_message">Elérhető verzió: %1$s. Letöltöd és telepíted?</string>
+    <string name="update_install">Telepítés</string>
+    <string name="update_later">Később</string>
+    <string name="update_up_to_date">Az alkalmazás naprakész.</string>
+    <string name="update_install_permission_title">Telepítési engedély szükséges</string>
+    <string name="update_install_permission_message">Engedélyezd az APK-k telepítését ehhez az alkalmazáshoz, majd érintsd meg újra a Frissítés gombot.</string>
+    <string name="update_open_settings">Beállítások megnyitása</string>
+    <string name="update_failed">A frissítés nem sikerült: %1$s</string>
 
     <string name="templates_title">Sablon választása</string>
     <string name="templates_empty">Nem található sablon.</string>
