@@ -9,6 +9,7 @@ import hu.gc.jegyzokonyv.data.repo.TemplateRepository
 import hu.gc.jegyzokonyv.domain.html.HtmlEngine
 import hu.gc.jegyzokonyv.domain.model.TemplateBlock
 import hu.gc.jegyzokonyv.domain.model.TemplateContent
+import hu.gc.jegyzokonyv.domain.model.TemplateKind
 import hu.gc.jegyzokonyv.domain.usecase.SaveTemplateUseCase
 import hu.gc.jegyzokonyv.ui.nav.Routes
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.jsoup.Jsoup
 import java.util.UUID
 import javax.inject.Inject
 
@@ -47,7 +49,8 @@ class TemplateEditorViewModel @Inject constructor(
                         isLoading = false,
                         name = template?.name.orEmpty(),
                         title = content.title,
-                        blocks = content.blocks,
+                        kind = content.kind,
+                        blocks = ensureImagesBlock(content.blocks),
                         isReadOnly = template?.isBuiltIn == true,
                     )
                 }
@@ -57,7 +60,8 @@ class TemplateEditorViewModel @Inject constructor(
                     it.copy(
                         isLoading = false,
                         title = starter.title,
-                        blocks = starter.blocks,
+                        kind = starter.kind,
+                        blocks = ensureImagesBlock(starter.blocks),
                     )
                 }
             }
@@ -106,6 +110,7 @@ class TemplateEditorViewModel @Inject constructor(
                     rows = rows.coerceIn(1, 50),
                     columns = columns.coerceIn(1, 20),
                     hasHeaderColumn = hasHeaderColumn,
+                    cells = List(rows.coerceIn(1, 50)) { List(columns.coerceIn(1, 20)) { "" } },
                 )
             )
         }
@@ -121,13 +126,21 @@ class TemplateEditorViewModel @Inject constructor(
         _state.update { s -> s.copy(blocks = s.blocks + TemplateBlock.Stamp(id = UUID.randomUUID().toString())) }
     }
 
+    fun addPageBreakBlock() {
+        if (_state.value.isReadOnly) return
+        _state.update { s -> s.copy(blocks = s.blocks + TemplateBlock.PageBreak(id = UUID.randomUUID().toString())) }
+    }
+
     fun removeBlock(id: String) {
         if (_state.value.isReadOnly) return
-        _state.update { s -> s.copy(blocks = s.blocks.filterNot { it.id == id }) }
+        _state.update { s -> s.copy(blocks = s.blocks.filterNot { it.id == id && it !is TemplateBlock.Images }) }
     }
 
     fun moveBlockUp(id: String) = moveBlock(id, offset = -1)
     fun moveBlockDown(id: String) = moveBlock(id, offset = 1)
+
+    private fun ensureImagesBlock(blocks: List<TemplateBlock>): List<TemplateBlock> =
+        if (blocks.any { it is TemplateBlock.Images }) blocks else blocks + TemplateBlock.Images(id = IMAGES_BLOCK_ID)
 
     private fun moveBlock(id: String, offset: Int) {
         if (_state.value.isReadOnly) return
@@ -144,9 +157,29 @@ class TemplateEditorViewModel @Inject constructor(
 
     fun previewHtml(todayIso: String): String {
         val current = _state.value
-        val content = TemplateContent(title = current.title, blocks = current.blocks)
+        val content = TemplateContent(title = current.title, kind = current.kind, blocks = current.blocks)
         val title = current.title.ifBlank { current.name.ifBlank { "Jegyzőkönyv" } }
         return htmlEngine.renderTemplate(content, title, todayIso, profileRepository.profile.value)
+    }
+
+    fun onPreviewHtmlChanged(html: String) {
+        if (_state.value.isReadOnly || html.isBlank()) return
+        val doc = runCatching { Jsoup.parse(html) }.getOrNull() ?: return
+        val tables = doc.select("table.editable-table[data-template-block-id]").associate { table ->
+            table.attr("data-template-block-id") to table.select("tr").map { row ->
+                row.select("th,td").map { it.wholeText().trim() }
+            }
+        }
+        if (tables.isEmpty()) return
+        _state.update { s ->
+            s.copy(blocks = s.blocks.map { block ->
+                if (block is TemplateBlock.Table && tables.containsKey(block.id)) {
+                    block.copy(cells = tables.getValue(block.id))
+                } else {
+                    block
+                }
+            })
+        }
     }
 
     fun save(fallbackName: String, onSaved: (String) -> Unit) {
@@ -160,6 +193,7 @@ class TemplateEditorViewModel @Inject constructor(
                 name = current.name,
                 content = TemplateContent(
                     title = current.title,
+                    kind = current.kind,
                     blocks = current.blocks,
                 ),
                 fallbackName = fallbackName,
@@ -167,6 +201,9 @@ class TemplateEditorViewModel @Inject constructor(
             _state.update { it.copy(isSaving = false) }
             onSaved(id)
         }
+    }
+    private companion object {
+        const val IMAGES_BLOCK_ID = "template-images"
     }
 }
 
@@ -177,5 +214,6 @@ data class TemplateEditorState(
     val isReadOnly: Boolean = false,
     val name: String = "",
     val title: String = "",
+    val kind: TemplateKind = TemplateKind.Standard,
     val blocks: List<TemplateBlock> = emptyList(),
 )

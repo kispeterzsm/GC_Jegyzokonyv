@@ -21,6 +21,8 @@ class DuplicateTemplateUseCase @Inject constructor(
                 is TemplateBlock.Table -> block.copy(id = newId)
                 is TemplateBlock.Signature -> TemplateBlock.Signature(id = newId)
                 is TemplateBlock.Stamp -> TemplateBlock.Stamp(id = newId)
+                is TemplateBlock.Images -> TemplateBlock.Images(id = newId)
+                is TemplateBlock.PageBreak -> TemplateBlock.PageBreak(id = newId)
             }
         }
         val newName = "${source.name} $copySuffix".trim()

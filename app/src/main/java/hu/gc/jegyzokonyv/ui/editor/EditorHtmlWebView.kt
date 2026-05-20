@@ -272,7 +272,7 @@ private fun injectEditBridge(html: String): String {
 private fun embedDraftImages(html: String, draftDir: File): String {
     return html.replace(Regex("""<img\b[^>]*\bsrc="([^"]+)"[^>]*>""")) { match ->
         val src = match.groupValues[1]
-        if (!isRelativeDraftImage(src)) return@replace match.value
+        if (!isRelativeDraftImage(src) && !src.startsWith("/")) return@replace match.value
         val image = resolveDraftImage(draftDir, src) ?: return@replace match.value
         val dataUri = previewDataUri(image) ?: return@replace match.value
         val originalClass = Regex("""\bclass="([^"]*)"""")
@@ -294,6 +294,7 @@ private fun resolveDraftImage(draftDir: File, src: String): File? {
         .substringBefore('#')
         .substringBefore('?')
         .trim()
+    if (normalizedSrc.startsWith("/")) return File(normalizedSrc).takeIf { it.isFile }
     if (!isRelativeDraftImage(normalizedSrc)) return null
 
     return runCatching {

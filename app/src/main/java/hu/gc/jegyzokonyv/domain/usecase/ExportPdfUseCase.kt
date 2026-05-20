@@ -84,20 +84,8 @@ class ExportPdfUseCase @Inject constructor(
         val blocks = buildList {
             content.children().forEach { element ->
                 when {
-                    element.hasClass("photo-block") -> {
-                        val image = element.selectFirst("img[src]")
-                        val source = image?.attr("src").orEmpty()
-                        add(
-                            ExportBlock.Photo(
-                                image = resolveDraftImage(draftDir, source)?.takeIf { it.isFile },
-                                source = source,
-                                caption = element.selectFirst("p")
-                                    ?.wholeText()
-                                    ?.trim()
-                                    ?.ifBlank { null },
-                            )
-                        )
-                    }
+                    element.hasClass("photo-block") -> addPhotoExportBlock(element, draftDir)
+                    element.hasClass("images-block") -> element.select(".photo-block").forEach { addPhotoExportBlock(it, draftDir) }
                     element.hasClass("date-block") -> {
                         blockText(element)?.let {
                             add(ExportBlock.Text(text = it, style = TextBlockStyle.Date))
@@ -119,6 +107,7 @@ class ExportPdfUseCase @Inject constructor(
                         val image = element.selectFirst("img[src]")?.attr("src").orEmpty()
                         add(ExportBlock.ProfileImage(resolveAnyImage(draftDir, image)?.takeIf { it.isFile }, "", false))
                     }
+                    element.hasClass("template-page-break") -> add(ExportBlock.PageBreak)
                 }
             }
         }
@@ -127,6 +116,21 @@ class ExportPdfUseCase @Inject constructor(
             title = title.ifBlank { DEFAULT_TITLE },
             meta = meta,
             blocks = blocks,
+        )
+    }
+
+    private fun MutableList<ExportBlock>.addPhotoExportBlock(element: Element, draftDir: File) {
+        val image = element.selectFirst("img[src]")
+        val source = image?.attr("src").orEmpty()
+        add(
+            ExportBlock.Photo(
+                image = resolveDraftImage(draftDir, source)?.takeIf { it.isFile },
+                source = source,
+                caption = element.selectFirst("p")
+                    ?.wholeText()
+                    ?.trim()
+                    ?.ifBlank { null },
+            )
         )
     }
 
@@ -748,6 +752,7 @@ class ExportPdfUseCase @Inject constructor(
                     is ExportBlock.Photo -> drawPhotoBlock(block)
                     is ExportBlock.Table -> drawTableBlock(block)
                     is ExportBlock.ProfileImage -> drawProfileImageBlock(block)
+                    is ExportBlock.PageBreak -> startPage()
                 }
             }
             finishCurrentPage()
@@ -1089,6 +1094,8 @@ class ExportPdfUseCase @Inject constructor(
             val label: String,
             val signature: Boolean,
         ) : ExportBlock()
+
+        data object PageBreak : ExportBlock()
     }
 
     private enum class TextBlockStyle {

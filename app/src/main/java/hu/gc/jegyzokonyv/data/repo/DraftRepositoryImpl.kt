@@ -53,10 +53,7 @@ class DraftRepositoryImpl @Inject constructor(
             val todayIso = dateFormatter().format(Date(now))
             val title = buildDraftTitle(content.title, todayIso)
             val profile = profileRepository.profile.value
-            val rendered = htmlEngine.renderTemplate(content, title, todayIso, profile)
-            val initial = rendered
-                .replace("Generálkivitelező: Gépész Centrál Kft.", "Generálkivitelező: ${profile.companyName}")
-                .replace("Kispéter Ákosné", profile.name)
+            val initial = htmlEngine.renderTemplate(content, title, todayIso, profile)
 
             fileStorage.draftDir(id)
             fileStorage.imagesDir(id)

@@ -20,7 +20,7 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
         profile: UserProfile?,
     ): String {
         if (content.kind == TemplateKind.SafetyWalkthrough) {
-            return renderSafetyWalkthrough(title, todayIso)
+            return renderSafetyWalkthrough(content, title, todayIso, profile)
         }
 
         val doc = parse(wrapperHtml(title))
@@ -37,6 +37,8 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
                 is TemplateBlock.Table -> appendEditableTable(container, block)
                 is TemplateBlock.Signature -> appendSignature(container, profile)
                 is TemplateBlock.Stamp -> appendStamp(container, profile)
+                is TemplateBlock.Images -> appendImagesAnchor(container)
+                is TemplateBlock.PageBreak -> appendPageBreak(container)
             }
         }
         return render(doc)
@@ -56,7 +58,7 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
             return render(doc)
         }
 
-        val content = ensureContentContainer(doc)
+        val content = ensureImagesContainer(doc) ?: ensureContentContainer(doc)
         val block = content.appendElement("div").addClass("photo-block")
         block.appendElement("img").attr("src", relativeImagePath)
         if (!caption.isNullOrBlank()) {
@@ -74,13 +76,16 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
     }
 
     private fun appendEditableTable(parent: org.jsoup.nodes.Element, block: TemplateBlock.Table) {
-        val table = parent.appendElement("table").addClass("editable-table")
+        val table = parent.appendElement("table")
+            .addClass("editable-table")
+            .attr("data-template-block-id", block.id)
         repeat(block.rows.coerceIn(1, 50)) { rowIndex ->
             val row = table.appendElement("tr")
             repeat(block.columns.coerceIn(1, 20)) { colIndex ->
                 val cell = if (block.hasHeaderColumn && colIndex == 0) row.appendElement("th") else row.appendElement("td")
                 cell.attr("contenteditable", "true")
                     .attr("data-field", "table_${block.id}_${rowIndex}_${colIndex}")
+                    .text(block.cells.getOrNull(rowIndex)?.getOrNull(colIndex).orEmpty())
             }
         }
     }
@@ -101,6 +106,25 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
         }
     }
 
+    private fun appendImagesAnchor(parent: org.jsoup.nodes.Element) {
+        parent.appendElement("div")
+            .addClass("images-block")
+            .attr("data-images-anchor", "true")
+            .appendElement("p")
+            .addClass("images-placeholder")
+            .text("Ide kerülnek a fotók")
+    }
+
+    private fun appendPageBreak(parent: org.jsoup.nodes.Element) {
+        parent.appendElement("div").addClass("template-page-break")
+    }
+
+    private fun ensureImagesContainer(doc: Document): org.jsoup.nodes.Element? {
+        val anchor = doc.selectFirst(".images-block[data-images-anchor=true]") ?: return null
+        anchor.selectFirst(".images-placeholder")?.remove()
+        return anchor
+    }
+
     private fun parse(html: String): Document {
         val doc = Jsoup.parse(html)
         doc.outputSettings()
@@ -116,7 +140,7 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
 
     private fun render(doc: Document): String = doc.outerHtml()
 
-    private fun renderSafetyWalkthrough(title: String, todayIso: String): String {
+    private fun renderSafetyWalkthrough(contentTemplate: TemplateContent, title: String, todayIso: String, profile: UserProfile?): String {
         val doc = parse(safetyWrapperHtml(title))
         val content = ensureContentContainer(doc)
         val page = content.appendElement("section").addClass("safety-page").addClass("safety-intro")
@@ -124,8 +148,8 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
         page.append(
             """
             <div class="intro-body">
-              <p><strong>Generálkivitelező: Gépész Centrál Kft.</strong></p>
-              <p class="inspection-row"><strong>Az ellenőrzést végezte:</strong> <strong>Kispéter Ákosné</strong> <strong>Dátum: ${formatHungarianDate(todayIso)}</strong></p>
+              <p><strong>Generálkivitelező: ${escapeHtml(profile?.companyName.orEmpty())}</strong></p>
+              <p class="inspection-row"><strong>Az ellenőrzést végezte:</strong> <strong>${escapeHtml(profile?.name.orEmpty())}</strong> <strong>Dátum: ${formatHungarianDate(todayIso)}</strong></p>
               <p>Megfelelt: ✓ <span>Nem felelt meg: X</span></p>
               <p><strong>Az együttműködés előmozdítása érdekében tett intézkedések</strong></p>
               <table class="cooperation-actions">
@@ -160,8 +184,23 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
             """.trimIndent()
         )
         page.appendElement("div").addClass("after-risk-page-break")
+        appendSafetyExtraTemplateBlocks(page, contentTemplate, todayIso, profile)
         appendSafetyChecklistPages(content)
         return render(doc)
+    }
+
+    private fun appendSafetyExtraTemplateBlocks(parent: org.jsoup.nodes.Element, content: TemplateContent, todayIso: String, profile: UserProfile?) {
+        content.blocks.filterNot { it is TemplateBlock.Date }.forEach { block ->
+            when (block) {
+                is TemplateBlock.Text -> parent.appendElement("div").addClass("text-block").appendElement("p").text(block.text)
+                is TemplateBlock.Table -> appendEditableTable(parent, block)
+                is TemplateBlock.Signature -> appendSignature(parent, profile)
+                is TemplateBlock.Stamp -> appendStamp(parent, profile)
+                is TemplateBlock.Images -> appendImagesAnchor(parent)
+                is TemplateBlock.PageBreak -> appendPageBreak(parent)
+                is TemplateBlock.Date -> parent.appendElement("div").addClass("date-block").text(todayIso)
+            }
+        }
     }
 
     private fun appendSafetyChecklistPages(content: org.jsoup.nodes.Element) {
@@ -241,6 +280,11 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
         return if (parts.size == 3) "${parts[0]}. ${parts[1]}. ${parts[2]}." else todayIso
     }
 
+    private fun escapeHtml(value: String): String = value
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+
     private fun wrapperHtml(title: String): String {
         val safeTitle = title
             .replace("&", "&amp;")
@@ -307,6 +351,9 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
               .signature-name { font-size: 13px; }
               .stamp-block { margin: 16px 0; text-align: right; page-break-inside: avoid; }
               .stamp-image { max-width: 160px; max-height: 100px; object-fit: contain; }
+              .images-block { margin: 12px 0; min-height: 36px; }
+              .images-placeholder { margin: 0; padding: 10px; border: 1px dashed #777; color: #666; text-align: center; }
+              .template-page-break { break-after: page; page-break-after: always; height: 1px; margin: 18px 0; border-top: 1px dashed #999; }
               [contenteditable="true"] { min-height: 20px; outline: 1px dashed transparent; }
               [contenteditable="true"]:focus { outline-color: #555; background: #fffde7; }
             </style>
@@ -372,6 +419,9 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
               .observation-table { width: 100%; margin-top: 0; font-size: 14px; }
               .observation-table th { width: 26%; }
               .observation-table td { min-height: 24px; white-space: pre-wrap; overflow-wrap: anywhere; }
+              .images-block { margin: 12px 0; min-height: 36px; }
+              .images-placeholder { margin: 0; padding: 10px; border: 1px dashed #777; color: #666; text-align: center; }
+              .template-page-break { break-after: page; page-break-after: always; height: 1px; margin: 18px 0; border-top: 1px dashed #999; }
               [contenteditable="true"] { min-height: 20px; outline: 1px dashed transparent; scroll-margin: 96px 0 24px; }
               [contenteditable="true"]:focus { outline-color: #555; background: #fffde7; }
               @media screen {

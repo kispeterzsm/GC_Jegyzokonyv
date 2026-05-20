@@ -26,7 +26,10 @@ sealed class TemplateBlock {
         val rows: Int,
         val columns: Int,
         val hasHeaderColumn: Boolean,
+        val cells: List<List<String>> = emptyList(),
     ) : TemplateBlock()
     data class Signature(override val id: String) : TemplateBlock()
     data class Stamp(override val id: String) : TemplateBlock()
+    data class Images(override val id: String) : TemplateBlock()
+    data class PageBreak(override val id: String) : TemplateBlock()
 }

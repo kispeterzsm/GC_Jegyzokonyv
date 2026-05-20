@@ -20,6 +20,8 @@ import androidx.compose.material.icons.filled.Draw
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.GridOn
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.InsertPageBreak
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -172,7 +174,7 @@ fun TemplateEditorScreen(
                             EditorHtmlWebView(
                                 html = viewModel.previewHtml(todayIso),
                                 draftDir = previewDir,
-                                onHtmlChanged = {},
+                                onHtmlChanged = viewModel::onPreviewHtmlChanged,
                                 onEditableCellFocusedChanged = {},
                                 dictatedText = null,
                                 dictationToken = 0,
@@ -205,6 +207,7 @@ fun TemplateEditorScreen(
                             AssistChip(onClick = { showTableDialog = true }, label = { Text("+ Táblázat") })
                             AssistChip(onClick = viewModel::addSignatureBlock, label = { Text("+ Aláírás") })
                             AssistChip(onClick = viewModel::addStampBlock, label = { Text("+ Bélyegző") })
+                            AssistChip(onClick = viewModel::addPageBreakBlock, label = { Text("+ Oldaltörés") })
                         }
                     }
                 }
@@ -275,6 +278,8 @@ private fun BlockRow(
                 )
                 is TemplateBlock.Signature -> BlockLabel(Icons.Filled.Draw, "Aláírás a profilból")
                 is TemplateBlock.Stamp -> BlockLabel(Icons.Filled.Check, "Bélyegző a profilból")
+                is TemplateBlock.Images -> BlockLabel(Icons.Filled.Image, "Fotók helye (nem törölhető)")
+                is TemplateBlock.PageBreak -> BlockLabel(Icons.Filled.InsertPageBreak, "Oldaltörés / új oldal")
             }
             if (!readOnly) {
                 Row(

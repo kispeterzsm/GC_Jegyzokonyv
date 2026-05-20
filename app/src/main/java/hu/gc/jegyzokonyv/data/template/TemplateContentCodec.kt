@@ -27,12 +27,19 @@ object TemplateContentCodec {
                     obj.put("rows", block.rows)
                     obj.put("columns", block.columns)
                     obj.put("hasHeaderColumn", block.hasHeaderColumn)
+                    obj.put("cells", JSONArray(block.cells.map { row -> JSONArray(row) }))
                 }
                 is TemplateBlock.Signature -> {
                     obj.put("type", "signature")
                 }
                 is TemplateBlock.Stamp -> {
                     obj.put("type", "stamp")
+                }
+                is TemplateBlock.Images -> {
+                    obj.put("type", "images")
+                }
+                is TemplateBlock.PageBreak -> {
+                    obj.put("type", "page_break")
                 }
             }
             blocksArray.put(obj)
@@ -63,10 +70,22 @@ object TemplateContentCodec {
                             rows = obj.optInt("rows", 2).coerceIn(1, 50),
                             columns = obj.optInt("columns", 2).coerceIn(1, 20),
                             hasHeaderColumn = obj.optBoolean("hasHeaderColumn", false),
+                            cells = obj.optJSONArray("cells")?.let { cellsJson ->
+                                buildList {
+                                    for (rowIndex in 0 until cellsJson.length()) {
+                                        val rowJson = cellsJson.optJSONArray(rowIndex) ?: JSONArray()
+                                        add(buildList {
+                                            for (colIndex in 0 until rowJson.length()) add(rowJson.optString(colIndex, ""))
+                                        })
+                                    }
+                                }
+                            } ?: emptyList(),
                         )
                     )
                     "signature" -> add(TemplateBlock.Signature(id = id))
                     "stamp" -> add(TemplateBlock.Stamp(id = id))
+                    "images" -> add(TemplateBlock.Images(id = id))
+                    "page_break" -> add(TemplateBlock.PageBreak(id = id))
                 }
             }
         }
