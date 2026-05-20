@@ -45,10 +45,12 @@ class SettingsViewModel @Inject constructor(
                 ProfileImageKind.Signature -> current.copy(
                     signaturePath = editedPath,
                     signatureOriginalPath = originalPath,
+                    signatureTransparency = 0f,
                 )
                 ProfileImageKind.Stamp -> current.copy(
                     stampPath = editedPath,
                     stampOriginalPath = originalPath,
+                    stampTransparency = 0f,
                 )
             }
             profileRepository.save(updated)
@@ -62,8 +64,14 @@ class SettingsViewModel @Inject constructor(
                 .onSuccess { editedPath ->
                     val latest = profileRepository.profile.value
                     val updated = when (kind) {
-                        ProfileImageKind.Signature -> latest.copy(signaturePath = editedPath)
-                        ProfileImageKind.Stamp -> latest.copy(stampPath = editedPath)
+                        ProfileImageKind.Signature -> latest.copy(
+                            signaturePath = editedPath,
+                            signatureTransparency = tolerance,
+                        )
+                        ProfileImageKind.Stamp -> latest.copy(
+                            stampPath = editedPath,
+                            stampTransparency = tolerance,
+                        )
                     }
                     profileRepository.save(updated)
                 }

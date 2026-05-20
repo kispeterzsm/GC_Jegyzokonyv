@@ -52,6 +52,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import hu.gc.jegyzokonyv.ui.home.UpdateDialog
 import java.io.File
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -172,6 +173,7 @@ fun ProfileScreen(
         ImageEditDialog(
             kind = kind,
             imagePath = if (kind == ProfileImageKind.Signature) draft.signaturePath else draft.stampPath,
+            initialTolerance = if (kind == ProfileImageKind.Signature) draft.signatureTransparency else draft.stampTransparency,
             onValueChange = { tolerance -> viewModel.editImage(kind, tolerance, draft) },
             onDismiss = { editing = null },
         )
@@ -230,10 +232,11 @@ private fun ProfileImagePreview(imagePath: String, modifier: Modifier = Modifier
 private fun ImageEditDialog(
     kind: ProfileImageKind,
     imagePath: String,
+    initialTolerance: Float,
     onValueChange: (Float) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var tolerance by remember(kind) { mutableStateOf(0f) }
+    var tolerance by remember(kind) { mutableStateOf(initialTolerance.coerceIn(0f, 100f)) }
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
@@ -247,6 +250,10 @@ private fun ImageEditDialog(
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 ProfileImagePreview(imagePath = imagePath, modifier = Modifier.fillMaxWidth().height(220.dp))
                 Text(stringResource(R.string.profile_transparency_slider))
+                LaunchedEffect(tolerance) {
+                    delay(150)
+                    onValueChange(tolerance)
+                }
                 Slider(
                     value = tolerance,
                     onValueChange = { tolerance = it },

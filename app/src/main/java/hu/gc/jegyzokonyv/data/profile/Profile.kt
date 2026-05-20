@@ -24,6 +24,8 @@ data class UserProfile(
     val stampPath: String = "",
     val signatureOriginalPath: String = "",
     val stampOriginalPath: String = "",
+    val signatureTransparency: Float = 0f,
+    val stampTransparency: Float = 0f,
 ) {
     fun missingForSafetyTemplate(): List<String> = buildList {
         if (name.isBlank()) add("név")
@@ -67,6 +69,8 @@ class ProfileRepositoryImpl @Inject constructor(
             .putString(KEY_STAMP, profile.stampPath)
             .putString(KEY_SIGNATURE_ORIGINAL, profile.signatureOriginalPath)
             .putString(KEY_STAMP_ORIGINAL, profile.stampOriginalPath)
+            .putFloat(KEY_SIGNATURE_TRANSPARENCY, profile.signatureTransparency)
+            .putFloat(KEY_STAMP_TRANSPARENCY, profile.stampTransparency)
             .apply()
         _profile.value = profile
     }
@@ -117,8 +121,11 @@ class ProfileRepositoryImpl @Inject constructor(
             }
         }
         output.setPixels(pixels, 0, source.width, 0, 0, source.width, source.height)
-        val edited = File(profileDir, "${kind.fileName}_edited.png")
+        val edited = File(profileDir, "${kind.fileName}_edited_${System.currentTimeMillis()}.png")
         FileOutputStream(edited).use { output.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        profileDir.listFiles { file ->
+            file.name.startsWith("${kind.fileName}_edited") && file.name != edited.name
+        }?.forEach { it.delete() }
         source.recycle()
         output.recycle()
         edited.absolutePath
@@ -144,6 +151,8 @@ class ProfileRepositoryImpl @Inject constructor(
         stampPath = prefs.getString(KEY_STAMP, "").orEmpty(),
         signatureOriginalPath = prefs.getString(KEY_SIGNATURE_ORIGINAL, "").orEmpty().ifBlank { prefs.getString(KEY_SIGNATURE, "").orEmpty() },
         stampOriginalPath = prefs.getString(KEY_STAMP_ORIGINAL, "").orEmpty().ifBlank { prefs.getString(KEY_STAMP, "").orEmpty() },
+        signatureTransparency = prefs.getFloat(KEY_SIGNATURE_TRANSPARENCY, 0f),
+        stampTransparency = prefs.getFloat(KEY_STAMP_TRANSPARENCY, 0f),
     )
 
     private companion object {
@@ -155,6 +164,8 @@ class ProfileRepositoryImpl @Inject constructor(
         const val KEY_STAMP = "stamp"
         const val KEY_SIGNATURE_ORIGINAL = "signatureOriginal"
         const val KEY_STAMP_ORIGINAL = "stampOriginal"
+        const val KEY_SIGNATURE_TRANSPARENCY = "signatureTransparency"
+        const val KEY_STAMP_TRANSPARENCY = "stampTransparency"
         const val MAX_EDIT_IMAGE_SIZE = 1800
     }
 }
