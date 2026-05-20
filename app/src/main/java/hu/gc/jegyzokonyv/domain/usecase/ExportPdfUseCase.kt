@@ -82,34 +82,7 @@ class ExportPdfUseCase @Inject constructor(
         val meta = doc.selectFirst(".meta")?.wholeText()?.trim()?.ifBlank { null }
         val content = doc.getElementById(CONTENT_ID) ?: doc.body()
         val blocks = buildList {
-            content.children().forEach { element ->
-                when {
-                    element.hasClass("photo-block") -> addPhotoExportBlock(element, draftDir)
-                    element.hasClass("images-block") -> element.select(".photo-block").forEach { addPhotoExportBlock(it, draftDir) }
-                    element.hasClass("date-block") -> {
-                        blockText(element)?.let {
-                            add(ExportBlock.Text(text = it, style = TextBlockStyle.Date))
-                        }
-                    }
-                    element.hasClass("text-block") -> {
-                        blockText(element)?.let {
-                            add(ExportBlock.Text(text = it, style = TextBlockStyle.Body))
-                        }
-                    }
-                    element.hasClass("editable-table") -> {
-                        add(ExportBlock.Table(rows = element.select("tr").map { row -> row.select("th,td").map { it.wholeText().trim() } }))
-                    }
-                    element.hasClass("signature-block") -> {
-                        val image = element.selectFirst("img[src]")?.attr("src").orEmpty()
-                        add(ExportBlock.ProfileImage(resolveAnyImage(draftDir, image)?.takeIf { it.isFile }, element.selectFirst(".signature-name")?.wholeText()?.trim().orEmpty(), true))
-                    }
-                    element.hasClass("stamp-block") -> {
-                        val image = element.selectFirst("img[src]")?.attr("src").orEmpty()
-                        add(ExportBlock.ProfileImage(resolveAnyImage(draftDir, image)?.takeIf { it.isFile }, "", false))
-                    }
-                    element.hasClass("template-page-break") -> add(ExportBlock.PageBreak)
-                }
-            }
+            content.children().forEach { element -> addExportBlocksFromElement(element, draftDir) }
         }
 
         return ExportDocument(
@@ -117,6 +90,48 @@ class ExportPdfUseCase @Inject constructor(
             meta = meta,
             blocks = blocks,
         )
+    }
+
+    private fun MutableList<ExportBlock>.addExportBlocksFromElement(element: Element, draftDir: File) {
+        when {
+            element.hasClass("photo-block") -> addPhotoExportBlock(element, draftDir)
+            element.hasClass("images-block") -> element.children().forEach { addExportBlocksFromElement(it, draftDir) }
+            element.hasClass("date-block") -> blockText(element)?.let { add(ExportBlock.Text(text = it, style = TextBlockStyle.Date)) }
+            element.hasClass("text-block") -> blockText(element)?.let { add(ExportBlock.Text(text = it, style = TextBlockStyle.Body)) }
+            element.hasClass("editable-table") || element.normalName() == "table" -> {
+                val rows = exportTableRows(element)
+                if (rows.isNotEmpty()) add(ExportBlock.Table(rows = rows))
+            }
+            element.hasClass("signature-block") -> {
+                val image = element.selectFirst("img[src]")?.attr("src").orEmpty()
+                add(ExportBlock.ProfileImage(resolveAnyImage(draftDir, image)?.takeIf { it.isFile }, element.selectFirst(".signature-name")?.wholeText()?.trim().orEmpty(), true))
+            }
+            element.hasClass("stamp-block") -> {
+                val image = element.selectFirst("img[src]")?.attr("src").orEmpty()
+                add(ExportBlock.ProfileImage(resolveAnyImage(draftDir, image)?.takeIf { it.isFile }, "", false))
+            }
+            element.hasClass("template-page-break") -> add(ExportBlock.PageBreak)
+            element.children().isNotEmpty() -> element.children().forEach { addExportBlocksFromElement(it, draftDir) }
+            element.wholeText().trim().isNotBlank() -> add(ExportBlock.Text(element.wholeText().trim(), TextBlockStyle.Body))
+        }
+    }
+
+    private fun exportTableRows(table: Element): List<List<String>> {
+        val rawRows = table.select("tr").map { row ->
+            row to row.select("th,td").map { cell -> cell to cell.wholeText().trim() }
+        }.filterNot { (row, cells) ->
+            row.attr("data-hide-if-empty") == "true" && cells.any { (cell, _) -> cell.attr("contenteditable") == "true" } && cells.filter { (cell, _) -> cell.attr("contenteditable") == "true" }.all { (_, text) -> text.isBlank() }
+        }
+        val hiddenColumns = rawRows.flatMap { (_, cells) ->
+            cells.mapIndexedNotNull { index, (cell, _) -> index.takeIf { cell.attr("data-hide-column-if-empty") == "true" } }
+        }.toSet().filter { index ->
+            rawRows.all { (_, cells) -> cells.getOrNull(index)?.second.orEmpty().isBlank() }
+        }.toSet()
+        return rawRows.map { (_, cells) ->
+            cells.mapIndexedNotNull { index, (cell, text) ->
+                if (index in hiddenColumns || (cell.attr("data-hide-if-empty") == "true" && text.isBlank())) null else text
+            }
+        }.filter { it.isNotEmpty() }
     }
 
     private fun MutableList<ExportBlock>.addPhotoExportBlock(element: Element, draftDir: File) {

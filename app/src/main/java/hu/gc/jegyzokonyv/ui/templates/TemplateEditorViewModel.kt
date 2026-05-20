@@ -7,6 +7,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import hu.gc.jegyzokonyv.data.profile.ProfileRepository
 import hu.gc.jegyzokonyv.data.repo.TemplateRepository
 import hu.gc.jegyzokonyv.domain.html.HtmlEngine
+import hu.gc.jegyzokonyv.domain.model.TableAxisSettings
+import hu.gc.jegyzokonyv.domain.model.TableCellSettings
 import hu.gc.jegyzokonyv.domain.model.TemplateBlock
 import hu.gc.jegyzokonyv.domain.model.TemplateContent
 import hu.gc.jegyzokonyv.domain.model.TemplateKind
@@ -87,6 +89,83 @@ class TemplateEditorViewModel @Inject constructor(
         }
     }
 
+    fun onHtmlBlockChange(id: String, html: String) {
+        if (_state.value.isReadOnly) return
+        _state.update { s ->
+            s.copy(blocks = s.blocks.map { b ->
+                if (b is TemplateBlock.Html && b.id == id) b.copy(html = html) else b
+            })
+        }
+    }
+
+    fun onTableCellTextChange(id: String, row: Int, column: Int, text: String) = updateTable(id) { table ->
+        table.copy(cells = table.normalizedCells().mapIndexed { rowIndex, values ->
+            if (rowIndex == row) values.mapIndexed { columnIndex, value -> if (columnIndex == column) text else value } else values
+        })
+    }
+
+    fun onTableRowSettingsChange(id: String, row: Int, settings: TableAxisSettings) = updateTable(id) { table ->
+        table.copy(rowSettings = table.normalizedRowSettings().mapIndexed { index, value -> if (index == row) settings else value })
+    }
+
+    fun onTableColumnSettingsChange(id: String, column: Int, settings: TableAxisSettings) = updateTable(id) { table ->
+        table.copy(columnSettings = table.normalizedColumnSettings().mapIndexed { index, value -> if (index == column) settings else value })
+    }
+
+    fun onTableCellSettingsChange(id: String, row: Int, column: Int, settings: TableCellSettings) = updateTable(id) { table ->
+        table.copy(cellSettings = table.normalizedCellSettings().mapIndexed { rowIndex, values ->
+            if (rowIndex == row) values.mapIndexed { columnIndex, value -> if (columnIndex == column) settings else value } else values
+        })
+    }
+
+    fun insertTableRowBelow(id: String, row: Int) = updateTable(id) { table ->
+        if (table.rows >= 50) return@updateTable table
+        val insertAt = (row + 1).coerceIn(0, table.rows.coerceIn(1, 50))
+        val columns = table.columns.coerceIn(1, 20)
+        table.copy(
+            rows = table.rows + 1,
+            cells = table.normalizedCells().toMutableList().apply { add(insertAt, List(columns) { "" }) },
+            rowSettings = table.normalizedRowSettings().toMutableList().apply { add(insertAt, TableAxisSettings()) },
+            cellSettings = table.normalizedCellSettings().toMutableList().apply { add(insertAt, List(columns) { TableCellSettings() }) },
+        )
+    }
+
+    fun insertTableColumnRight(id: String, column: Int) = updateTable(id) { table ->
+        if (table.columns >= 20) return@updateTable table
+        val rows = table.rows.coerceIn(1, 50)
+        val insertAt = (column + 1).coerceIn(0, table.columns.coerceIn(1, 20))
+        table.copy(
+            columns = table.columns + 1,
+            cells = table.normalizedCells().map { row -> row.toMutableList().apply { add(insertAt, "") } },
+            columnSettings = table.normalizedColumnSettings().toMutableList().apply { add(insertAt, TableAxisSettings()) },
+            cellSettings = table.normalizedCellSettings().map { row -> row.toMutableList().apply { add(insertAt, TableCellSettings()) } }.take(rows),
+        )
+    }
+
+    fun deleteTableRow(id: String, row: Int) = updateTable(id) { table ->
+        if (table.rows <= 1) return@updateTable table
+        val removeAt = row.coerceIn(0, table.rows - 1)
+        table.copy(
+            rows = table.rows - 1,
+            cells = table.normalizedCells().filterIndexed { index, _ -> index != removeAt },
+            rowSettings = table.normalizedRowSettings().filterIndexed { index, _ -> index != removeAt },
+            cellSettings = table.normalizedCellSettings().filterIndexed { index, _ -> index != removeAt },
+        )
+    }
+
+    fun deleteTableColumn(id: String, column: Int) = updateTable(id) { table ->
+        if (table.columns <= 1) return@updateTable table
+        val removeAt = column.coerceIn(0, table.columns - 1)
+        val hasTickCells = table.normalizedCellSettings().any { row -> row.getOrNull(removeAt)?.toggleCheck == true }
+        if (hasTickCells) return@updateTable table
+        table.copy(
+            columns = table.columns - 1,
+            cells = table.normalizedCells().map { row -> row.filterIndexed { index, _ -> index != removeAt } },
+            columnSettings = table.normalizedColumnSettings().filterIndexed { index, _ -> index != removeAt },
+            cellSettings = table.normalizedCellSettings().map { row -> row.filterIndexed { index, _ -> index != removeAt } },
+        )
+    }
+
     fun addTextBlock() {
         if (_state.value.isReadOnly) return
         _state.update { s ->
@@ -131,6 +210,32 @@ class TemplateEditorViewModel @Inject constructor(
         _state.update { s -> s.copy(blocks = s.blocks + TemplateBlock.PageBreak(id = UUID.randomUUID().toString())) }
     }
 
+    fun addHtmlBlock(html: String = DEFAULT_HTML_BLOCK) {
+        if (_state.value.isReadOnly) return
+        _state.update { s -> s.copy(blocks = s.blocks + TemplateBlock.Html(id = UUID.randomUUID().toString(), html = html)) }
+    }
+
+    fun addSafetyHeaderBlock() = addHtmlBlock(SAFETY_HEADER_HTML)
+
+    fun addCheckTableBlock(rows: Int, columns: Int, tickColumnFirst: Boolean) {
+        if (_state.value.isReadOnly) return
+        val safeRows = rows.coerceIn(1, 50)
+        val safeColumns = columns.coerceIn(1, 20)
+        val tickIndex = if (tickColumnFirst) 0 else safeColumns - 1
+        _state.update { s ->
+            s.copy(
+                blocks = s.blocks + TemplateBlock.Table(
+                    id = UUID.randomUUID().toString(),
+                    rows = safeRows,
+                    columns = safeColumns,
+                    hasHeaderColumn = false,
+                    cells = List(safeRows) { List(safeColumns) { column -> if (column == tickIndex) "X" else "" } },
+                    cellSettings = List(safeRows) { List(safeColumns) { column -> if (column == tickIndex) TableCellSettings(editable = false, toggleCheck = true) else TableCellSettings() } },
+                )
+            )
+        }
+    }
+
     fun removeBlock(id: String) {
         if (_state.value.isReadOnly) return
         _state.update { s -> s.copy(blocks = s.blocks.filterNot { it.id == id && it !is TemplateBlock.Images }) }
@@ -141,6 +246,27 @@ class TemplateEditorViewModel @Inject constructor(
 
     private fun ensureImagesBlock(blocks: List<TemplateBlock>): List<TemplateBlock> =
         if (blocks.any { it is TemplateBlock.Images }) blocks else blocks + TemplateBlock.Images(id = IMAGES_BLOCK_ID)
+
+    private fun updateTable(id: String, transform: (TemplateBlock.Table) -> TemplateBlock.Table) {
+        if (_state.value.isReadOnly) return
+        _state.update { s ->
+            s.copy(blocks = s.blocks.map { block ->
+                if (block is TemplateBlock.Table && block.id == id) transform(block) else block
+            })
+        }
+    }
+
+    private fun TemplateBlock.Table.normalizedCells(): List<List<String>> =
+        List(rows.coerceIn(1, 50)) { row -> List(columns.coerceIn(1, 20)) { column -> cells.getOrNull(row)?.getOrNull(column).orEmpty() } }
+
+    private fun TemplateBlock.Table.normalizedRowSettings(): List<TableAxisSettings> =
+        List(rows.coerceIn(1, 50)) { row -> rowSettings.getOrNull(row) ?: TableAxisSettings() }
+
+    private fun TemplateBlock.Table.normalizedColumnSettings(): List<TableAxisSettings> =
+        List(columns.coerceIn(1, 20)) { column -> columnSettings.getOrNull(column) ?: TableAxisSettings() }
+
+    private fun TemplateBlock.Table.normalizedCellSettings(): List<List<TableCellSettings>> =
+        List(rows.coerceIn(1, 50)) { row -> List(columns.coerceIn(1, 20)) { column -> cellSettings.getOrNull(row)?.getOrNull(column) ?: TableCellSettings() } }
 
     private fun moveBlock(id: String, offset: Int) {
         if (_state.value.isReadOnly) return
@@ -170,13 +296,16 @@ class TemplateEditorViewModel @Inject constructor(
                 row.select("th,td").map { it.wholeText().trim() }
             }
         }
-        if (tables.isEmpty()) return
+        val htmlBlocks = doc.select(".html-block[data-template-block-id]").associate { block ->
+            block.attr("data-template-block-id") to block.html()
+        }
+        if (tables.isEmpty() && htmlBlocks.isEmpty()) return
         _state.update { s ->
             s.copy(blocks = s.blocks.map { block ->
-                if (block is TemplateBlock.Table && tables.containsKey(block.id)) {
-                    block.copy(cells = tables.getValue(block.id))
-                } else {
-                    block
+                when {
+                    block is TemplateBlock.Table && tables.containsKey(block.id) -> block.copy(cells = tables.getValue(block.id))
+                    block is TemplateBlock.Html && htmlBlocks.containsKey(block.id) -> block.copy(html = htmlBlocks.getValue(block.id))
+                    else -> block
                 }
             })
         }
@@ -204,6 +333,12 @@ class TemplateEditorViewModel @Inject constructor(
     }
     private companion object {
         const val IMAGES_BLOCK_ID = "template-images"
+        const val DEFAULT_HTML_BLOCK = "<p contenteditable=\"true\">Szerkeszthető HTML szöveg</p>"
+        const val SAFETY_HEADER_HTML = """
+            <table class="editable-table" style="width:100%;border-collapse:collapse;table-layout:fixed">
+              <tr><th contenteditable="true">Projekt / helyszín</th><th contenteditable="true">Dokumentum címe</th><th contenteditable="true">Melléklet</th></tr>
+            </table>
+        """
     }
 }
 

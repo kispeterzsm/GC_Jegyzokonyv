@@ -1,5 +1,7 @@
 package hu.gc.jegyzokonyv.data.template
 
+import hu.gc.jegyzokonyv.domain.model.TableAxisSettings
+import hu.gc.jegyzokonyv.domain.model.TableCellSettings
 import hu.gc.jegyzokonyv.domain.model.TemplateBlock
 import hu.gc.jegyzokonyv.domain.model.TemplateContent
 import hu.gc.jegyzokonyv.domain.model.TemplateKind
@@ -28,6 +30,9 @@ object TemplateContentCodec {
                     obj.put("columns", block.columns)
                     obj.put("hasHeaderColumn", block.hasHeaderColumn)
                     obj.put("cells", JSONArray(block.cells.map { row -> JSONArray(row) }))
+                    obj.put("rowSettings", JSONArray(block.rowSettings.map { it.toJson() }))
+                    obj.put("columnSettings", JSONArray(block.columnSettings.map { it.toJson() }))
+                    obj.put("cellSettings", JSONArray(block.cellSettings.map { row -> JSONArray(row.map { it.toJson() }) }))
                 }
                 is TemplateBlock.Signature -> {
                     obj.put("type", "signature")
@@ -40,6 +45,10 @@ object TemplateContentCodec {
                 }
                 is TemplateBlock.PageBreak -> {
                     obj.put("type", "page_break")
+                }
+                is TemplateBlock.Html -> {
+                    obj.put("type", "html")
+                    obj.put("html", block.html)
                 }
             }
             blocksArray.put(obj)
@@ -80,15 +89,96 @@ object TemplateContentCodec {
                                     }
                                 }
                             } ?: emptyList(),
+                            rowSettings = obj.optJSONArray("rowSettings")?.let { settingsJson ->
+                                buildList {
+                                    for (index in 0 until settingsJson.length()) add(settingsJson.optJSONObject(index).toAxisSettings())
+                                }
+                            } ?: emptyList(),
+                            columnSettings = obj.optJSONArray("columnSettings")?.let { settingsJson ->
+                                buildList {
+                                    for (index in 0 until settingsJson.length()) add(settingsJson.optJSONObject(index).toAxisSettings())
+                                }
+                            } ?: emptyList(),
+                            cellSettings = obj.optJSONArray("cellSettings")?.let { settingsJson ->
+                                buildList {
+                                    for (rowIndex in 0 until settingsJson.length()) {
+                                        val rowJson = settingsJson.optJSONArray(rowIndex) ?: JSONArray()
+                                        add(buildList {
+                                            for (colIndex in 0 until rowJson.length()) add(rowJson.optJSONObject(colIndex).toCellSettings())
+                                        })
+                                    }
+                                }
+                            } ?: emptyList(),
                         )
                     )
                     "signature" -> add(TemplateBlock.Signature(id = id))
                     "stamp" -> add(TemplateBlock.Stamp(id = id))
                     "images" -> add(TemplateBlock.Images(id = id))
                     "page_break" -> add(TemplateBlock.PageBreak(id = id))
+                    "html" -> add(TemplateBlock.Html(id = id, html = obj.optString("html", "")))
                 }
             }
         }
         return TemplateContent(title = title, kind = kind, blocks = blocks)
+    }
+
+    private fun TableAxisSettings.toJson() = JSONObject().apply {
+        put("backgroundColor", backgroundColor)
+        put("textColor", textColor)
+        put("textAlign", textAlign)
+        put("tickXBackgroundColor", tickXBackgroundColor)
+        put("tickXTextColor", tickXTextColor)
+        put("tickCheckedBackgroundColor", tickCheckedBackgroundColor)
+        put("tickCheckedTextColor", tickCheckedTextColor)
+        editable?.let { put("editable", it) }
+        put("hideIfEmpty", hideIfEmpty)
+        put("mergeAll", mergeAll)
+    }
+
+    private fun TableCellSettings.toJson() = JSONObject().apply {
+        put("backgroundColor", backgroundColor)
+        put("textColor", textColor)
+        put("textAlign", textAlign)
+        put("tickXBackgroundColor", tickXBackgroundColor)
+        put("tickXTextColor", tickXTextColor)
+        put("tickCheckedBackgroundColor", tickCheckedBackgroundColor)
+        put("tickCheckedTextColor", tickCheckedTextColor)
+        editable?.let { put("editable", it) }
+        put("hideIfEmpty", hideIfEmpty)
+        put("toggleCheck", toggleCheck)
+        put("mergeRight", mergeRight)
+    }
+
+    private fun JSONObject?.toAxisSettings(): TableAxisSettings {
+        if (this == null) return TableAxisSettings()
+        return TableAxisSettings(
+            backgroundColor = optString("backgroundColor", ""),
+            textColor = optString("textColor", ""),
+            textAlign = optString("textAlign", "left"),
+            tickXBackgroundColor = optString("tickXBackgroundColor", ""),
+            tickXTextColor = optString("tickXTextColor", ""),
+            tickCheckedBackgroundColor = optString("tickCheckedBackgroundColor", ""),
+            tickCheckedTextColor = optString("tickCheckedTextColor", ""),
+            editable = if (has("editable")) optBoolean("editable") else null,
+            hideIfEmpty = optBoolean("hideIfEmpty", false),
+            mergeAll = optBoolean("mergeAll", false),
+        )
+    }
+
+    private fun JSONObject?.toCellSettings(): TableCellSettings {
+        if (this == null) return TableCellSettings()
+        return TableCellSettings(
+            backgroundColor = optString("backgroundColor", ""),
+            textColor = optString("textColor", ""),
+            textAlign = optString("textAlign", "left"),
+            tickXBackgroundColor = optString("tickXBackgroundColor", ""),
+            tickXTextColor = optString("tickXTextColor", ""),
+            tickCheckedBackgroundColor = optString("tickCheckedBackgroundColor", ""),
+            tickCheckedTextColor = optString("tickCheckedTextColor", ""),
+            editable = if (has("editable")) optBoolean("editable") else null,
+            hideIfEmpty = optBoolean("hideIfEmpty", false),
+            toggleCheck = optBoolean("toggleCheck", false),
+            mergeRight = optBoolean("mergeRight", false),
+        )
     }
 }

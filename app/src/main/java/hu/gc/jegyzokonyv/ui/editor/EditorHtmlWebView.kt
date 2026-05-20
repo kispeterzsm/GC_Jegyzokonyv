@@ -180,9 +180,17 @@ private fun injectEditBridge(html: String): String {
               window.$BRIDGE_NAME.editableFocused(focused);
             }
           }
+          function applyCheckStyle(cell) {
+            var checked = (cell.textContent || '').trim() === '✓';
+            var bg = checked ? cell.getAttribute('data-check-bg') : cell.getAttribute('data-x-bg');
+            var color = checked ? cell.getAttribute('data-check-color') : cell.getAttribute('data-x-color');
+            if (bg) cell.style.background = bg;
+            if (color) cell.style.color = color;
+          }
           function toggleCheck(cell) {
             var current = (cell.textContent || '').trim();
             cell.textContent = current === '✓' ? 'X' : '✓';
+            applyCheckStyle(cell);
             saveNow();
           }
           function storeSelection() {
@@ -229,6 +237,7 @@ private fun injectEditBridge(html: String): String {
           window.EditorCommands = {
             insertText: insertText
           };
+          document.querySelectorAll('[data-toggle-check="true"]').forEach(applyCheckStyle);
           document.addEventListener('click', function(event) {
             var target = event.target;
             if (!target || !target.closest) return;

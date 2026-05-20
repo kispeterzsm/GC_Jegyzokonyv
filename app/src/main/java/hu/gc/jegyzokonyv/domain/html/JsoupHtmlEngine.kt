@@ -1,6 +1,8 @@
 package hu.gc.jegyzokonyv.domain.html
 
 import hu.gc.jegyzokonyv.data.profile.UserProfile
+import hu.gc.jegyzokonyv.domain.model.TableAxisSettings
+import hu.gc.jegyzokonyv.domain.model.TableCellSettings
 import hu.gc.jegyzokonyv.domain.model.TemplateBlock
 import hu.gc.jegyzokonyv.domain.model.TemplateContent
 import hu.gc.jegyzokonyv.domain.model.TemplateKind
@@ -23,7 +25,7 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
             return renderSafetyWalkthrough(content, title, todayIso, profile)
         }
 
-        val doc = parse(wrapperHtml(title))
+        val doc = parse(wrapperHtml(title, showHeading = content.title.isNotBlank()))
         val container = ensureContentContainer(doc)
         content.blocks.forEach { block ->
             when (block) {
@@ -39,6 +41,7 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
                 is TemplateBlock.Stamp -> appendStamp(container, profile)
                 is TemplateBlock.Images -> appendImagesAnchor(container)
                 is TemplateBlock.PageBreak -> appendPageBreak(container)
+                is TemplateBlock.Html -> appendHtmlBlock(container, block)
             }
         }
         return render(doc)
@@ -79,16 +82,80 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
         val table = parent.appendElement("table")
             .addClass("editable-table")
             .attr("data-template-block-id", block.id)
-        repeat(block.rows.coerceIn(1, 50)) { rowIndex ->
+        val rows = block.rows.coerceIn(1, 50)
+        val columns = block.columns.coerceIn(1, 20)
+        val skipped = mutableSetOf<Pair<Int, Int>>()
+        repeat(rows) { rowIndex ->
             val row = table.appendElement("tr")
-            repeat(block.columns.coerceIn(1, 20)) { colIndex ->
+            val rowSettings = block.rowSettings.getOrNull(rowIndex) ?: TableAxisSettings()
+            if (rowSettings.hideIfEmpty) row.attr("data-hide-if-empty", "true")
+            val rowMergeColumns = if (rowSettings.mergeAll) (0 until columns).filter { col -> !block.tableCellSettings(rowIndex, col).toggleCheck } else emptyList()
+            repeat(columns) { colIndex ->
+                if (rowIndex to colIndex in skipped) return@repeat
+                val columnSettings = block.columnSettings.getOrNull(colIndex) ?: TableAxisSettings()
+                val cellSettings = block.tableCellSettings(rowIndex, colIndex)
+                if (rowMergeColumns.isNotEmpty() && colIndex in rowMergeColumns && colIndex != rowMergeColumns.first()) return@repeat
+                var colSpan = 1
+                var rowSpan = 1
+                when {
+                    rowMergeColumns.isNotEmpty() && colIndex == rowMergeColumns.first() -> {
+                        colSpan = rowMergeColumns.size
+                        rowMergeColumns.drop(1).forEach { skipped += rowIndex to it }
+                    }
+                    columnSettings.mergeAll && !cellSettings.toggleCheck && rowIndex == 0 && (0 until rows).none { block.tableCellSettings(it, colIndex).toggleCheck } -> {
+                        rowSpan = rows
+                        (1 until rows).forEach { skipped += it to colIndex }
+                    }
+                    cellSettings.mergeRight && !cellSettings.toggleCheck && colIndex + 1 < columns && !block.tableCellSettings(rowIndex, colIndex + 1).toggleCheck -> {
+                        colSpan = 2
+                        skipped += rowIndex to (colIndex + 1)
+                    }
+                }
                 val cell = if (block.hasHeaderColumn && colIndex == 0) row.appendElement("th") else row.appendElement("td")
-                cell.attr("contenteditable", "true")
-                    .attr("data-field", "table_${block.id}_${rowIndex}_${colIndex}")
-                    .text(block.cells.getOrNull(rowIndex)?.getOrNull(colIndex).orEmpty())
+                if (colSpan > 1) cell.attr("colspan", colSpan.toString())
+                if (rowSpan > 1) cell.attr("rowspan", rowSpan.toString())
+                val editable = !cellSettings.toggleCheck && (cellSettings.editable ?: rowSettings.editable ?: columnSettings.editable ?: true)
+                var background = cellSettings.backgroundColor.ifBlank { rowSettings.backgroundColor.ifBlank { columnSettings.backgroundColor } }
+                var textColor = cellSettings.textColor.ifBlank { rowSettings.textColor.ifBlank { columnSettings.textColor } }
+                val tickXBackground = cellSettings.tickXBackgroundColor.ifBlank { columnSettings.tickXBackgroundColor }
+                val tickXTextColor = cellSettings.tickXTextColor.ifBlank { columnSettings.tickXTextColor }
+                val tickCheckedBackground = cellSettings.tickCheckedBackgroundColor.ifBlank { columnSettings.tickCheckedBackgroundColor }
+                val tickCheckedTextColor = cellSettings.tickCheckedTextColor.ifBlank { columnSettings.tickCheckedTextColor }
+                if (cellSettings.toggleCheck) {
+                    val isChecked = block.cells.getOrNull(rowIndex)?.getOrNull(colIndex).orEmpty().trim() == "✓"
+                    background = if (isChecked) tickCheckedBackground.ifBlank { background } else tickXBackground.ifBlank { background }
+                    textColor = if (isChecked) tickCheckedTextColor.ifBlank { textColor } else tickXTextColor.ifBlank { textColor }
+                }
+                val textAlign = cellSettings.textAlign.takeIf { it != "left" }
+                    ?: rowSettings.textAlign.takeIf { it != "left" }
+                    ?: columnSettings.textAlign.takeIf { it != "left" }
+                    ?: "left"
+                if (cellSettings.toggleCheck) {
+                    cell.attr("data-toggle-check", "true")
+                    if (tickXBackground.isNotBlank()) cell.attr("data-x-bg", tickXBackground)
+                    if (tickXTextColor.isNotBlank()) cell.attr("data-x-color", tickXTextColor)
+                    if (tickCheckedBackground.isNotBlank()) cell.attr("data-check-bg", tickCheckedBackground)
+                    if (tickCheckedTextColor.isNotBlank()) cell.attr("data-check-color", tickCheckedTextColor)
+                } else if (editable) {
+                    cell.attr("contenteditable", "true")
+                        .attr("data-field", "table_${block.id}_${rowIndex}_${colIndex}")
+                }
+                val style = buildList {
+                    if (background.isNotBlank()) add("background:$background")
+                    if (textColor.isNotBlank()) add("color:$textColor")
+                    add("text-align:${if (cellSettings.toggleCheck) "center" else textAlign}")
+                    if (cellSettings.toggleCheck) add("width:32px;font-weight:bold")
+                }.joinToString(";")
+                if (style.isNotBlank()) cell.attr("style", style)
+                if (cellSettings.hideIfEmpty) cell.attr("data-hide-if-empty", "true")
+                if (columnSettings.hideIfEmpty) cell.attr("data-hide-column-if-empty", "true")
+                cell.text(block.cells.getOrNull(rowIndex)?.getOrNull(colIndex).orEmpty())
             }
         }
     }
+
+    private fun TemplateBlock.Table.tableCellSettings(row: Int, column: Int): TableCellSettings =
+        cellSettings.getOrNull(row)?.getOrNull(column) ?: TableCellSettings()
 
     private fun appendSignature(parent: org.jsoup.nodes.Element, profile: UserProfile?) {
         val block = parent.appendElement("div").addClass("signature-block")
@@ -117,6 +184,13 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
 
     private fun appendPageBreak(parent: org.jsoup.nodes.Element) {
         parent.appendElement("div").addClass("template-page-break")
+    }
+
+    private fun appendHtmlBlock(parent: org.jsoup.nodes.Element, block: TemplateBlock.Html) {
+        parent.appendElement("div")
+            .addClass("html-block")
+            .attr("data-template-block-id", block.id)
+            .html(block.html)
     }
 
     private fun ensureImagesContainer(doc: Document): org.jsoup.nodes.Element? {
@@ -198,6 +272,7 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
                 is TemplateBlock.Stamp -> appendStamp(parent, profile)
                 is TemplateBlock.Images -> appendImagesAnchor(parent)
                 is TemplateBlock.PageBreak -> appendPageBreak(parent)
+                is TemplateBlock.Html -> appendHtmlBlock(parent, block)
                 is TemplateBlock.Date -> parent.appendElement("div").addClass("date-block").text(todayIso)
             }
         }
@@ -285,11 +360,12 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
         .replace("<", "&lt;")
         .replace(">", "&gt;")
 
-    private fun wrapperHtml(title: String): String {
+    private fun wrapperHtml(title: String, showHeading: Boolean): String {
         val safeTitle = title
             .replace("&", "&amp;")
             .replace("<", "&lt;")
             .replace(">", "&gt;")
+        val heading = if (showHeading) "<h1>$safeTitle</h1>" else ""
         return """
             <!DOCTYPE html>
             <html lang="hu">
@@ -359,7 +435,7 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
             </style>
             </head>
             <body>
-            <h1>$safeTitle</h1>
+            $heading
             <div id="content"></div>
             </body>
             </html>
