@@ -108,6 +108,17 @@ class ExportPdfUseCase @Inject constructor(
                             add(ExportBlock.Text(text = it, style = TextBlockStyle.Body))
                         }
                     }
+                    element.hasClass("editable-table") -> {
+                        add(ExportBlock.Table(rows = element.select("tr").map { row -> row.select("th,td").map { it.wholeText().trim() } }))
+                    }
+                    element.hasClass("signature-block") -> {
+                        val image = element.selectFirst("img[src]")?.attr("src").orEmpty()
+                        add(ExportBlock.ProfileImage(resolveAnyImage(draftDir, image)?.takeIf { it.isFile }, element.selectFirst(".signature-name")?.wholeText()?.trim().orEmpty(), true))
+                    }
+                    element.hasClass("stamp-block") -> {
+                        val image = element.selectFirst("img[src]")?.attr("src").orEmpty()
+                        add(ExportBlock.ProfileImage(resolveAnyImage(draftDir, image)?.takeIf { it.isFile }, "", false))
+                    }
                 }
             }
         }
@@ -127,6 +138,11 @@ class ExportPdfUseCase @Inject constructor(
             element.wholeText().trim()
         }
         return text.ifBlank { null }
+    }
+
+    private fun resolveAnyImage(draftDir: File, src: String): File? {
+        if (src.startsWith("/")) return File(src)
+        return resolveDraftImage(draftDir, src)
     }
 
     private fun resolveDraftImage(draftDir: File, src: String): File? {
@@ -730,6 +746,8 @@ class ExportPdfUseCase @Inject constructor(
                 when (block) {
                     is ExportBlock.Text -> drawTextBlock(block)
                     is ExportBlock.Photo -> drawPhotoBlock(block)
+                    is ExportBlock.Table -> drawTableBlock(block)
+                    is ExportBlock.ProfileImage -> drawProfileImageBlock(block)
                 }
             }
             finishCurrentPage()
@@ -751,6 +769,50 @@ class ExportPdfUseCase @Inject constructor(
                 TextBlockStyle.Date -> datePaint
             }
             drawWrappedText(block.text, paint, spacingAfter = 10f)
+        }
+
+        private fun drawTableBlock(block: ExportBlock.Table) {
+            val rows = block.rows.filter { it.isNotEmpty() }
+            if (rows.isEmpty()) return
+            val columns = rows.maxOf { it.size }.coerceAtLeast(1)
+            val colWidth = CONTENT_WIDTH_PT / columns
+            rows.forEach { row ->
+                val height = 28f
+                if (y + height > PAGE_BOTTOM_PT) startPage()
+                repeat(columns) { col ->
+                    val rect = RectF(PAGE_MARGIN_PT + col * colWidth, y, PAGE_MARGIN_PT + (col + 1) * colWidth, y + height)
+                    canvas.drawRect(rect, placeholderPaint)
+                    val layout = staticLayout(row.getOrNull(col).orEmpty(), bodyPaint, (colWidth - 8f).roundToInt().coerceAtLeast(1))
+                    canvas.save()
+                    canvas.clipRect(rect)
+                    canvas.translate(rect.left + 4f, rect.top + 4f)
+                    layout.draw(canvas)
+                    canvas.restore()
+                }
+                y += height
+            }
+            y += 12f
+        }
+
+        private fun drawProfileImageBlock(block: ExportBlock.ProfileImage) {
+            val image = block.image ?: run {
+                if (block.label.isNotBlank()) drawWrappedText(block.label, bodyPaint, spacingAfter = 12f)
+                return
+            }
+            val bounds = decodeImageBounds(image) ?: return
+            val width = if (block.signature) 170f else 140f
+            val height = if (block.signature) 70f else 95f
+            if (y + height + 24f > PAGE_BOTTOM_PT) startPage()
+            val left = PAGE_WIDTH_PT - PAGE_MARGIN_PT - width
+            if (drawBitmap(image, bounds, readOrientation(image), RectF(left, y, left + width, y + height))) imageCount += 1
+            y += height
+            if (block.signature) {
+                canvas.drawLine(left, y, left + width, y, linePaint)
+                y += 4f
+                if (block.label.isNotBlank()) drawWrappedText(block.label, bodyPaint, spacingAfter = 10f)
+            } else {
+                y += 12f
+            }
         }
 
         private fun drawPhotoBlock(block: ExportBlock.Photo) {
@@ -1018,6 +1080,14 @@ class ExportPdfUseCase @Inject constructor(
             val image: File?,
             val source: String,
             val caption: String?,
+        ) : ExportBlock()
+
+        data class Table(val rows: List<List<String>>) : ExportBlock()
+
+        data class ProfileImage(
+            val image: File?,
+            val label: String,
+            val signature: Boolean,
         ) : ExportBlock()
     }
 

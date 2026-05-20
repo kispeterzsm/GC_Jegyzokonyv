@@ -22,6 +22,18 @@ object TemplateContentCodec {
                 is TemplateBlock.Date -> {
                     obj.put("type", "date")
                 }
+                is TemplateBlock.Table -> {
+                    obj.put("type", "table")
+                    obj.put("rows", block.rows)
+                    obj.put("columns", block.columns)
+                    obj.put("hasHeaderColumn", block.hasHeaderColumn)
+                }
+                is TemplateBlock.Signature -> {
+                    obj.put("type", "signature")
+                }
+                is TemplateBlock.Stamp -> {
+                    obj.put("type", "stamp")
+                }
             }
             blocksArray.put(obj)
         }
@@ -45,6 +57,16 @@ object TemplateContentCodec {
                 when (obj.optString("type")) {
                     "text" -> add(TemplateBlock.Text(id = id, text = obj.optString("text", "")))
                     "date" -> add(TemplateBlock.Date(id = id))
+                    "table" -> add(
+                        TemplateBlock.Table(
+                            id = id,
+                            rows = obj.optInt("rows", 2).coerceIn(1, 50),
+                            columns = obj.optInt("columns", 2).coerceIn(1, 20),
+                            hasHeaderColumn = obj.optBoolean("hasHeaderColumn", false),
+                        )
+                    )
+                    "signature" -> add(TemplateBlock.Signature(id = id))
+                    "stamp" -> add(TemplateBlock.Stamp(id = id))
                 }
             }
         }

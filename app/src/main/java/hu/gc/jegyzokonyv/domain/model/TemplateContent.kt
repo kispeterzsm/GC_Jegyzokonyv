@@ -21,4 +21,12 @@ sealed class TemplateBlock {
 
     data class Text(override val id: String, val text: String) : TemplateBlock()
     data class Date(override val id: String) : TemplateBlock()
+    data class Table(
+        override val id: String,
+        val rows: Int,
+        val columns: Int,
+        val hasHeaderColumn: Boolean,
+    ) : TemplateBlock()
+    data class Signature(override val id: String) : TemplateBlock()
+    data class Stamp(override val id: String) : TemplateBlock()
 }

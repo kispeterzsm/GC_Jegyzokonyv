@@ -4,7 +4,9 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import hu.gc.jegyzokonyv.data.profile.ProfileRepository
 import hu.gc.jegyzokonyv.data.repo.TemplateRepository
+import hu.gc.jegyzokonyv.domain.html.HtmlEngine
 import hu.gc.jegyzokonyv.domain.model.TemplateBlock
 import hu.gc.jegyzokonyv.domain.model.TemplateContent
 import hu.gc.jegyzokonyv.domain.usecase.SaveTemplateUseCase
@@ -22,6 +24,8 @@ class TemplateEditorViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val templateRepository: TemplateRepository,
     private val saveTemplate: SaveTemplateUseCase,
+    private val htmlEngine: HtmlEngine,
+    private val profileRepository: ProfileRepository,
 ) : ViewModel() {
 
     private val templateId: String? = savedStateHandle.get<String>(Routes.ARG_TEMPLATE_ID)
@@ -93,6 +97,30 @@ class TemplateEditorViewModel @Inject constructor(
         }
     }
 
+    fun addTableBlock(rows: Int, columns: Int, hasHeaderColumn: Boolean) {
+        if (_state.value.isReadOnly) return
+        _state.update { s ->
+            s.copy(
+                blocks = s.blocks + TemplateBlock.Table(
+                    id = UUID.randomUUID().toString(),
+                    rows = rows.coerceIn(1, 50),
+                    columns = columns.coerceIn(1, 20),
+                    hasHeaderColumn = hasHeaderColumn,
+                )
+            )
+        }
+    }
+
+    fun addSignatureBlock() {
+        if (_state.value.isReadOnly) return
+        _state.update { s -> s.copy(blocks = s.blocks + TemplateBlock.Signature(id = UUID.randomUUID().toString())) }
+    }
+
+    fun addStampBlock() {
+        if (_state.value.isReadOnly) return
+        _state.update { s -> s.copy(blocks = s.blocks + TemplateBlock.Stamp(id = UUID.randomUUID().toString())) }
+    }
+
     fun removeBlock(id: String) {
         if (_state.value.isReadOnly) return
         _state.update { s -> s.copy(blocks = s.blocks.filterNot { it.id == id }) }
@@ -112,6 +140,13 @@ class TemplateEditorViewModel @Inject constructor(
             list.add(target, item)
             s.copy(blocks = list)
         }
+    }
+
+    fun previewHtml(todayIso: String): String {
+        val current = _state.value
+        val content = TemplateContent(title = current.title, blocks = current.blocks)
+        val title = current.title.ifBlank { current.name.ifBlank { "Jegyzőkönyv" } }
+        return htmlEngine.renderTemplate(content, title, todayIso, profileRepository.profile.value)
     }
 
     fun save(fallbackName: String, onSaved: (String) -> Unit) {

@@ -1,5 +1,6 @@
 package hu.gc.jegyzokonyv.domain.html
 
+import hu.gc.jegyzokonyv.data.profile.UserProfile
 import hu.gc.jegyzokonyv.domain.model.TemplateBlock
 import hu.gc.jegyzokonyv.domain.model.TemplateContent
 import hu.gc.jegyzokonyv.domain.model.TemplateKind
@@ -16,6 +17,7 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
         content: TemplateContent,
         title: String,
         todayIso: String,
+        profile: UserProfile?,
     ): String {
         if (content.kind == TemplateKind.SafetyWalkthrough) {
             return renderSafetyWalkthrough(title, todayIso)
@@ -32,6 +34,9 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
                 is TemplateBlock.Date -> {
                     container.appendElement("div").addClass("date-block").text(todayIso)
                 }
+                is TemplateBlock.Table -> appendEditableTable(container, block)
+                is TemplateBlock.Signature -> appendSignature(container, profile)
+                is TemplateBlock.Stamp -> appendStamp(container, profile)
             }
         }
         return render(doc)
@@ -66,6 +71,34 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
         val block = content.appendElement("div").addClass("text-block")
         block.appendElement("p").text(text)
         return render(doc)
+    }
+
+    private fun appendEditableTable(parent: org.jsoup.nodes.Element, block: TemplateBlock.Table) {
+        val table = parent.appendElement("table").addClass("editable-table")
+        repeat(block.rows.coerceIn(1, 50)) { rowIndex ->
+            val row = table.appendElement("tr")
+            repeat(block.columns.coerceIn(1, 20)) { colIndex ->
+                val cell = if (block.hasHeaderColumn && colIndex == 0) row.appendElement("th") else row.appendElement("td")
+                cell.attr("contenteditable", "true")
+                    .attr("data-field", "table_${block.id}_${rowIndex}_${colIndex}")
+            }
+        }
+    }
+
+    private fun appendSignature(parent: org.jsoup.nodes.Element, profile: UserProfile?) {
+        val block = parent.appendElement("div").addClass("signature-block")
+        profile?.signaturePath?.takeIf { it.isNotBlank() }?.let { path ->
+            block.appendElement("img").addClass("signature-image").attr("src", path)
+        }
+        block.appendElement("div").addClass("signature-line")
+        block.appendElement("div").addClass("signature-name").text(profile?.name.orEmpty())
+    }
+
+    private fun appendStamp(parent: org.jsoup.nodes.Element, profile: UserProfile?) {
+        val block = parent.appendElement("div").addClass("stamp-block")
+        profile?.stampPath?.takeIf { it.isNotBlank() }?.let { path ->
+            block.appendElement("img").addClass("stamp-image").attr("src", path)
+        }
     }
 
     private fun parse(html: String): Document {
@@ -265,6 +298,17 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
                 margin: 12px 0;
                 font-weight: 600;
               }
+              .editable-table { width: 100%; border-collapse: collapse; margin: 12px 0; table-layout: fixed; }
+              .editable-table th, .editable-table td { border: 1px solid #333; min-height: 28px; padding: 6px; vertical-align: top; }
+              .editable-table th { background: #eeeeee; font-weight: 600; }
+              .signature-block { width: 220px; margin: 28px 0 12px auto; text-align: center; page-break-inside: avoid; }
+              .signature-image { max-width: 200px; max-height: 70px; object-fit: contain; display: block; margin: 0 auto -6px; }
+              .signature-line { border-top: 1px solid #111; height: 1px; margin: 0 12px 4px; }
+              .signature-name { font-size: 13px; }
+              .stamp-block { margin: 16px 0; text-align: right; page-break-inside: avoid; }
+              .stamp-image { max-width: 160px; max-height: 100px; object-fit: contain; }
+              [contenteditable="true"] { min-height: 20px; outline: 1px dashed transparent; }
+              [contenteditable="true"]:focus { outline-color: #555; background: #fffde7; }
             </style>
             </head>
             <body>
