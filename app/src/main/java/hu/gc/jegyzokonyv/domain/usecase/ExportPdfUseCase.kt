@@ -29,6 +29,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import java.util.Locale
 import javax.inject.Inject
 import kotlin.math.max
 import kotlin.math.min
@@ -116,11 +117,13 @@ class ExportPdfUseCase @Inject constructor(
         }
     }
 
-    private fun exportTableRows(table: Element): List<List<String>> {
+    private fun exportTableRows(table: Element): List<List<ExportTableCell>> {
         val rawRows = table.select("tr").map { row ->
             row to row.select("th,td").map { cell -> cell to cell.wholeText().trim() }
         }.filterNot { (row, cells) ->
-            row.attr("data-hide-if-empty") == "true" && cells.any { (cell, _) -> cell.attr("contenteditable") == "true" } && cells.filter { (cell, _) -> cell.attr("contenteditable") == "true" }.all { (_, text) -> text.isBlank() }
+            row.attr("data-hide-if-empty") == "true" &&
+                cells.any { (cell, _) -> cell.attr("contenteditable") == "true" } &&
+                cells.filter { (cell, _) -> cell.attr("contenteditable") == "true" }.all { (_, text) -> text.isBlank() }
         }
         val hiddenColumns = rawRows.flatMap { (_, cells) ->
             cells.mapIndexedNotNull { index, (cell, _) -> index.takeIf { cell.attr("data-hide-column-if-empty") == "true" } }
@@ -129,9 +132,60 @@ class ExportPdfUseCase @Inject constructor(
         }.toSet()
         return rawRows.map { (_, cells) ->
             cells.mapIndexedNotNull { index, (cell, text) ->
-                if (index in hiddenColumns || (cell.attr("data-hide-if-empty") == "true" && text.isBlank())) null else text
+                if (index in hiddenColumns || (cell.attr("data-hide-if-empty") == "true" && text.isBlank())) {
+                    null
+                } else {
+                    cell.toExportTableCell(text)
+                }
             }
         }.filter { it.isNotEmpty() }
+    }
+
+    private fun Element.toExportTableCell(text: String): ExportTableCell {
+        val style = parseStyle(attr("style"))
+        return ExportTableCell(
+            text = text,
+            colSpan = attr("colspan").toIntOrNull()?.coerceAtLeast(1) ?: 1,
+            rowSpan = attr("rowspan").toIntOrNull()?.coerceAtLeast(1) ?: 1,
+            backgroundColor = parseCssColor(style["background"] ?: style["background-color"]),
+            textColor = parseCssColor(style["color"]),
+            textAlign = when (style["text-align"]?.lowercase(Locale.ROOT)) {
+                "center" -> TextAlign.Center
+                "right", "end" -> TextAlign.Right
+                else -> TextAlign.Left
+            },
+            bold = normalName() == "th" || style["font-weight"]?.contains("bold", ignoreCase = true) == true,
+        )
+    }
+
+    private fun parseStyle(style: String): Map<String, String> =
+        style.split(';')
+            .mapNotNull { declaration ->
+                val name = declaration.substringBefore(':').trim().lowercase(Locale.ROOT)
+                val value = declaration.substringAfter(':', "").trim()
+                if (name.isBlank() || value.isBlank()) null else name to value
+            }
+            .toMap()
+
+    private fun parseCssColor(value: String?): Int? {
+        val color = value?.trim()?.lowercase(Locale.ROOT)?.takeIf { it.isNotBlank() } ?: return null
+        return runCatching {
+            when {
+                color.startsWith("#") -> Color.parseColor(color)
+                color.startsWith("rgb") -> {
+                    val parts = color.substringAfter('(').substringBefore(')').split(',').mapNotNull { it.trim().toFloatOrNull()?.roundToInt() }
+                    if (parts.size >= 3) Color.rgb(parts[0].coerceIn(0, 255), parts[1].coerceIn(0, 255), parts[2].coerceIn(0, 255)) else null
+                }
+                color == "red" -> Color.RED
+                color == "blue" -> Color.BLUE
+                color == "green" -> Color.GREEN
+                color == "yellow" -> Color.YELLOW
+                color == "black" -> Color.BLACK
+                color == "white" -> Color.WHITE
+                color == "gray" || color == "grey" -> Color.GRAY
+                else -> Color.parseColor(color)
+            }
+        }.getOrNull()
     }
 
     private fun MutableList<ExportBlock>.addPhotoExportBlock(element: Element, draftDir: File) {
@@ -749,6 +803,7 @@ class ExportPdfUseCase @Inject constructor(
             style = Paint.Style.STROKE
             strokeWidth = 1f
         }
+        private val tableFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
         private val placeholderTextPaint = textPaint(size = 9.5f, color = Color.rgb(90, 90, 90))
 
         fun render(): ExportStats {
@@ -794,24 +849,63 @@ class ExportPdfUseCase @Inject constructor(
         private fun drawTableBlock(block: ExportBlock.Table) {
             val rows = block.rows.filter { it.isNotEmpty() }
             if (rows.isEmpty()) return
-            val columns = rows.maxOf { it.size }.coerceAtLeast(1)
+            val columns = rows.maxOf { row -> row.sumOf { it.colSpan } }.coerceAtLeast(1)
             val colWidth = CONTENT_WIDTH_PT / columns
+            val rowHeight = 28f
+            val rowSpanContinuations = IntArray(columns)
             rows.forEach { row ->
-                val height = 28f
-                if (y + height > PAGE_BOTTOM_PT) startPage()
-                repeat(columns) { col ->
-                    val rect = RectF(PAGE_MARGIN_PT + col * colWidth, y, PAGE_MARGIN_PT + (col + 1) * colWidth, y + height)
-                    canvas.drawRect(rect, placeholderPaint)
-                    val layout = staticLayout(row.getOrNull(col).orEmpty(), bodyPaint, (colWidth - 8f).roundToInt().coerceAtLeast(1))
-                    canvas.save()
-                    canvas.clipRect(rect)
-                    canvas.translate(rect.left + 4f, rect.top + 4f)
-                    layout.draw(canvas)
-                    canvas.restore()
+                if (y + rowHeight > PAGE_BOTTOM_PT) startPage()
+                var column = 0
+                row.forEach { cell ->
+                    while (column < columns && rowSpanContinuations[column] > 0) column++
+                    if (column >= columns) return@forEach
+                    val spanColumns = cell.colSpan.coerceAtLeast(1).coerceAtMost(columns - column)
+                    val spanRows = cell.rowSpan.coerceAtLeast(1)
+                    val rect = RectF(
+                        PAGE_MARGIN_PT + column * colWidth,
+                        y,
+                        PAGE_MARGIN_PT + (column + spanColumns) * colWidth,
+                        y + rowHeight * spanRows,
+                    )
+                    drawExportTableCell(rect, cell)
+                    if (spanRows > 1) {
+                        for (spanColumn in column until (column + spanColumns)) {
+                            rowSpanContinuations[spanColumn] = max(rowSpanContinuations[spanColumn], spanRows - 1)
+                        }
+                    }
+                    column += spanColumns
                 }
-                y += height
+                for (index in rowSpanContinuations.indices) {
+                    if (rowSpanContinuations[index] > 0) rowSpanContinuations[index] -= 1
+                }
+                y += rowHeight
             }
             y += 12f
+        }
+
+        private fun drawExportTableCell(rect: RectF, cell: ExportTableCell) {
+            tableFillPaint.color = cell.backgroundColor ?: Color.WHITE
+            canvas.drawRect(rect, tableFillPaint)
+            canvas.drawRect(rect, placeholderPaint)
+            val paint = TextPaint(if (cell.bold) datePaint else bodyPaint).apply {
+                color = cell.textColor ?: (if (cell.bold) datePaint.color else bodyPaint.color)
+            }
+            val alignment = when (cell.textAlign) {
+                TextAlign.Center -> Layout.Alignment.ALIGN_CENTER
+                TextAlign.Right -> Layout.Alignment.ALIGN_OPPOSITE
+                TextAlign.Left -> Layout.Alignment.ALIGN_NORMAL
+            }
+            val layout = staticLayout(
+                text = cell.text,
+                paint = paint,
+                width = (rect.width() - 8f).roundToInt().coerceAtLeast(1),
+                alignment = alignment,
+            )
+            canvas.save()
+            canvas.clipRect(rect)
+            canvas.translate(rect.left + 4f, rect.top + 4f)
+            layout.draw(canvas)
+            canvas.restore()
         }
 
         private fun drawProfileImageBlock(block: ExportBlock.ProfileImage) {
@@ -1102,7 +1196,7 @@ class ExportPdfUseCase @Inject constructor(
             val caption: String?,
         ) : ExportBlock()
 
-        data class Table(val rows: List<List<String>>) : ExportBlock()
+        data class Table(val rows: List<List<ExportTableCell>>) : ExportBlock()
 
         data class ProfileImage(
             val image: File?,
@@ -1112,6 +1206,18 @@ class ExportPdfUseCase @Inject constructor(
 
         data object PageBreak : ExportBlock()
     }
+
+    private data class ExportTableCell(
+        val text: String,
+        val colSpan: Int = 1,
+        val rowSpan: Int = 1,
+        val backgroundColor: Int? = null,
+        val textColor: Int? = null,
+        val textAlign: TextAlign = TextAlign.Left,
+        val bold: Boolean = false,
+    )
+
+    private enum class TextAlign { Left, Center, Right }
 
     private enum class TextBlockStyle {
         Body,
@@ -1173,10 +1279,15 @@ class ExportPdfUseCase @Inject constructor(
             this.typeface = typeface
         }
 
-        fun staticLayout(text: String, paint: TextPaint, width: Int): StaticLayout =
+        fun staticLayout(
+            text: String,
+            paint: TextPaint,
+            width: Int,
+            alignment: Layout.Alignment = Layout.Alignment.ALIGN_NORMAL,
+        ): StaticLayout =
             StaticLayout.Builder
                 .obtain(text, 0, text.length, paint, width)
-                .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+                .setAlignment(alignment)
                 .setLineSpacing(0f, 1f)
                 .setIncludePad(false)
                 .build()
