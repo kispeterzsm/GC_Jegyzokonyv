@@ -96,6 +96,7 @@
     <string name="camera_capture">Felvétel</string>
 
     <string name="share_chooser_title">Megosztás</string>
+    <string name="pdf_preview_title">PDF előnézet</string>
 
     <string name="default_draft_title_prefix">Jegyzőkönyv</string>
 

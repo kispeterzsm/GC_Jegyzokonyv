@@ -7,11 +7,13 @@ object Routes {
     const val PROFILE = "profile"
     const val EDITOR = "editor/{draftId}"
     const val CAMERA = "camera/{draftId}"
+    const val PDF_PREVIEW = "pdf/{draftId}"
     const val TEMPLATE_NEW = "template/new"
     const val TEMPLATE_EDIT = "template/{templateId}/edit"
 
     fun editor(draftId: String) = "editor/$draftId"
     fun camera(draftId: String) = "camera/$draftId"
+    fun pdfPreview(draftId: String) = "pdf/$draftId"
     fun templateEdit(templateId: String) = "template/$templateId/edit"
 
     const val ARG_DRAFT_ID = "draftId"

@@ -28,7 +28,6 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PictureAsPdf
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -77,6 +76,7 @@ fun DocumentEditorScreen(
     onTakePhoto: () -> Unit,
     onBack: () -> Unit,
     onDeleted: () -> Unit,
+    onPdfExported: () -> Unit,
     navController: NavController,
     viewModel: DocumentEditorViewModel = hiltViewModel(),
 ) {
@@ -98,9 +98,7 @@ fun DocumentEditorScreen(
     var dictationToken by remember { mutableStateOf(0) }
     var scrollToBottomToken by remember { mutableStateOf(0) }
 
-    val exportSuccessMsg = stringResource(R.string.editor_export_success)
     val exportFailMsg = stringResource(R.string.editor_export_failed)
-    val chooserTitle = stringResource(R.string.share_chooser_title)
     val isSafetyWalkthrough = html.contains("safety-walkthrough")
     val dictationUnavailableMsg = stringResource(R.string.editor_dictation_unavailable)
     val dictationPermissionMsg = stringResource(R.string.editor_dictation_permission)
@@ -146,7 +144,7 @@ fun DocumentEditorScreen(
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
-                is EditorEvent.ExportFinished -> snackbarHostState.showSnackbar(exportSuccessMsg)
+                is EditorEvent.ExportFinished -> onPdfExported()
                 is EditorEvent.ExportFailed -> {
                     val reason = event.reason
                     val msg = if (!reason.isNullOrBlank()) {
@@ -156,7 +154,6 @@ fun DocumentEditorScreen(
                     }
                     snackbarHostState.showSnackbar(msg)
                 }
-                is EditorEvent.LaunchShare -> context.startActivity(event.intent)
             }
         }
     }
@@ -210,14 +207,6 @@ fun DocumentEditorScreen(
                                 onClick = {
                                     menuOpen = false
                                     viewModel.onExportPdf()
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.editor_share_pdf)) },
-                                leadingIcon = { Icon(Icons.Filled.Share, contentDescription = null) },
-                                onClick = {
-                                    menuOpen = false
-                                    viewModel.onShareLastPdf(chooserTitle)
                                 },
                             )
                             DropdownMenuItem(

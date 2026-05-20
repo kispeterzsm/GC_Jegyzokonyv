@@ -8,6 +8,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import hu.gc.jegyzokonyv.ui.editor.CameraCaptureScreen
 import hu.gc.jegyzokonyv.ui.editor.DocumentEditorScreen
+import hu.gc.jegyzokonyv.ui.editor.PdfPreviewScreen
 import hu.gc.jegyzokonyv.ui.home.HomeScreen
 import hu.gc.jegyzokonyv.ui.settings.ProfileScreen
 import hu.gc.jegyzokonyv.ui.settings.SettingsScreen
@@ -86,7 +87,19 @@ fun AppNavHost() {
                 onDeleted = {
                     navController.popBackStack(Routes.HOME, inclusive = false)
                 },
+                onPdfExported = {
+                    navController.navigate(Routes.pdfPreview(draftId))
+                },
                 navController = navController,
+            )
+        }
+
+        composable(
+            Routes.PDF_PREVIEW,
+            arguments = listOf(navArgument(Routes.ARG_DRAFT_ID) { type = NavType.StringType }),
+        ) {
+            PdfPreviewScreen(
+                onBack = { navController.popBackStack() },
             )
         }
 
