@@ -16,6 +16,9 @@ import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
 import android.util.Log
+import hu.gc.jegyzokonyv.data.profile.MissingProfileInfoException
+import hu.gc.jegyzokonyv.data.profile.ProfileRepository
+import hu.gc.jegyzokonyv.data.profile.UserProfile
 import hu.gc.jegyzokonyv.data.repo.DraftRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -33,6 +36,7 @@ import kotlin.math.roundToInt
 
 class ExportPdfUseCase @Inject constructor(
     private val draftRepository: DraftRepository,
+    private val profileRepository: ProfileRepository,
 ) {
 
     suspend operator fun invoke(draftId: String): File {
@@ -47,7 +51,8 @@ class ExportPdfUseCase @Inject constructor(
 
         return withTimeout(PDF_TIMEOUT_MS) {
             withContext(Dispatchers.IO) {
-                val safetyDocument = parseSafetyDocument(html, draftDir)
+                val profile = profileRepository.profile.value
+                val safetyDocument = parseSafetyDocument(html, draftDir, profile)
                 val stats = if (safetyDocument != null) {
                     renderSafetyPdf(safetyDocument, tempOutput)
                 } else {
@@ -163,9 +168,11 @@ class ExportPdfUseCase @Inject constructor(
         }
     }
 
-    private fun parseSafetyDocument(html: String, draftDir: File): SafetyDocument? {
+    private fun parseSafetyDocument(html: String, draftDir: File, profile: UserProfile): SafetyDocument? {
         val doc = Jsoup.parse(html)
         if (!doc.body().hasClass(SAFETY_CLASS)) return null
+        val missingProfileInfo = profile.missingForSafetyTemplate()
+        if (missingProfileInfo.isNotEmpty()) throw MissingProfileInfoException(missingProfileInfo)
 
         val dateText = doc.selectFirst(".inspection-row")?.wholeText()
             ?.substringAfter("Dátum:", "")
@@ -223,7 +230,15 @@ class ExportPdfUseCase @Inject constructor(
                 followUp = field("follow_up"),
             )
         }
-        return SafetyDocument(dateText = dateText, checklistPages = checklistPages, cooperationActions = cooperationActions, observations = observations)
+        return SafetyDocument(
+            dateText = dateText,
+            profile = profile,
+            signature = profileRepository.imageFile(profile.signaturePath),
+            stamp = profileRepository.imageFile(profile.stampPath),
+            checklistPages = checklistPages,
+            cooperationActions = cooperationActions,
+            observations = observations,
+        )
     }
 
     private fun defaultCooperationActions(): List<SafetyCheckItem> = listOf(
@@ -385,10 +400,10 @@ class ExportPdfUseCase @Inject constructor(
 
         private fun drawIntro() {
             y += 14f
-            drawText("Generálkivitelező: Gépész Centrál Kft.", boldPaint, SAFETY_MARGIN_PT + 22f, y, SAFETY_WIDTH_PT - 44f)
+            drawText("Generálkivitelező: ${document.profile.companyName}", boldPaint, SAFETY_MARGIN_PT + 22f, y, SAFETY_WIDTH_PT - 44f)
             y += 28f
             drawText("Az ellenőrzést végezte:", boldPaint, SAFETY_MARGIN_PT + 22f, y, 170f)
-            drawText("Kispéter Ákosné", boldPaint, SAFETY_MARGIN_PT + 215f, y, 150f)
+            drawText(document.profile.name, boldPaint, SAFETY_MARGIN_PT + 215f, y, 150f)
             drawText("Dátum: ${document.dateText}", boldPaint, SAFETY_MARGIN_PT + 395f, y, 150f)
             y += 30f
             drawText("Megfelelt: ✓        Nem felelt meg: X", textPaint, SAFETY_MARGIN_PT + 22f, y, SAFETY_WIDTH_PT - 44f)
@@ -404,6 +419,8 @@ class ExportPdfUseCase @Inject constructor(
             drawRiskMatrix()
             y += 24f
             drawRiskLevels()
+            y += 18f
+            drawProfileImages()
             drawPageNumber()
         }
 
@@ -478,6 +495,23 @@ class ExportPdfUseCase @Inject constructor(
                 drawCell(RectF(x, y, x + widths[2], y + height), row.third, textPaint)
                 y += height
             }
+        }
+
+        private fun drawProfileImages() {
+            val signature = document.signature
+            val stamp = document.stamp
+            val top = y
+            signature?.let { image ->
+                decodeImageBounds(image)?.let { bounds ->
+                    drawBitmap(image, bounds, readOrientation(image), RectF(SAFETY_MARGIN_PT + 60f, top, SAFETY_MARGIN_PT + 210f, top + 55f))
+                }
+            }
+            stamp?.let { image ->
+                decodeImageBounds(image)?.let { bounds ->
+                    drawBitmap(image, bounds, readOrientation(image), RectF(SAFETY_MARGIN_PT + 330f, top, SAFETY_MARGIN_PT + 480f, top + 70f))
+                }
+            }
+            y += 78f
         }
 
         private fun drawObservation(observation: SafetyObservation) {
@@ -934,6 +968,9 @@ class ExportPdfUseCase @Inject constructor(
 
     private data class SafetyDocument(
         val dateText: String,
+        val profile: UserProfile,
+        val signature: File?,
+        val stamp: File?,
         val checklistPages: List<SafetyChecklistPage>,
         val cooperationActions: List<SafetyCheckItem>,
         val observations: List<SafetyObservation>,

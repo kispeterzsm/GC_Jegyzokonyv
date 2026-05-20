@@ -3,6 +3,8 @@ package hu.gc.jegyzokonyv.ui.nav
 object Routes {
     const val HOME = "home"
     const val TEMPLATES = "templates"
+    const val SETTINGS = "settings"
+    const val PROFILE = "profile"
     const val EDITOR = "editor/{draftId}"
     const val CAMERA = "camera/{draftId}"
     const val TEMPLATE_NEW = "template/new"

@@ -3,6 +3,7 @@ package hu.gc.jegyzokonyv.data.repo
 import hu.gc.jegyzokonyv.data.db.DraftDao
 import hu.gc.jegyzokonyv.data.db.DraftEntity
 import hu.gc.jegyzokonyv.data.file.FileStorage
+import hu.gc.jegyzokonyv.data.profile.ProfileRepository
 import hu.gc.jegyzokonyv.di.IoDispatcher
 import hu.gc.jegyzokonyv.domain.html.HtmlEngine
 import hu.gc.jegyzokonyv.domain.model.Draft
@@ -27,6 +28,7 @@ class DraftRepositoryImpl @Inject constructor(
     private val fileStorage: FileStorage,
     private val htmlEngine: HtmlEngine,
     private val templateRepository: TemplateRepository,
+    private val profileRepository: ProfileRepository,
     @IoDispatcher private val io: CoroutineDispatcher,
 ) : DraftRepository {
 
@@ -50,7 +52,11 @@ class DraftRepositoryImpl @Inject constructor(
             val now = System.currentTimeMillis()
             val todayIso = dateFormatter().format(Date(now))
             val title = buildDraftTitle(content.title, todayIso)
-            val initial = htmlEngine.renderTemplate(content, title, todayIso)
+            val rendered = htmlEngine.renderTemplate(content, title, todayIso)
+            val profile = profileRepository.profile.value
+            val initial = rendered
+                .replace("Generálkivitelező: Gépész Centrál Kft.", "Generálkivitelező: ${profile.companyName}")
+                .replace("Kispéter Ákosné", profile.name)
 
             fileStorage.draftDir(id)
             fileStorage.imagesDir(id)

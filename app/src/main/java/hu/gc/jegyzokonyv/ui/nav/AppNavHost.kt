@@ -9,6 +9,8 @@ import androidx.navigation.navArgument
 import hu.gc.jegyzokonyv.ui.editor.CameraCaptureScreen
 import hu.gc.jegyzokonyv.ui.editor.DocumentEditorScreen
 import hu.gc.jegyzokonyv.ui.home.HomeScreen
+import hu.gc.jegyzokonyv.ui.settings.ProfileScreen
+import hu.gc.jegyzokonyv.ui.settings.SettingsScreen
 import hu.gc.jegyzokonyv.ui.templates.TemplateEditorScreen
 import hu.gc.jegyzokonyv.ui.templates.TemplatePickerScreen
 
@@ -22,6 +24,21 @@ fun AppNavHost() {
             HomeScreen(
                 onNewDraft = { navController.navigate(Routes.TEMPLATES) },
                 onOpenDraft = { id -> navController.navigate(Routes.editor(id)) },
+                onSettings = { navController.navigate(Routes.SETTINGS) },
+            )
+        }
+
+        composable(Routes.SETTINGS) {
+            SettingsScreen(
+                onBack = { navController.popBackStack() },
+                onProfile = { navController.navigate(Routes.PROFILE) },
+            )
+        }
+
+        composable(Routes.PROFILE) {
+            ProfileScreen(
+                onBack = { navController.popBackStack() },
+                onSaved = { navController.popBackStack(Routes.SETTINGS, inclusive = false) },
             )
         }
 

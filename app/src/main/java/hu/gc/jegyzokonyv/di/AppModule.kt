@@ -13,6 +13,8 @@ import hu.gc.jegyzokonyv.data.db.DraftDao
 import hu.gc.jegyzokonyv.data.db.TemplateDao
 import hu.gc.jegyzokonyv.data.file.FileStorage
 import hu.gc.jegyzokonyv.data.file.FileStorageImpl
+import hu.gc.jegyzokonyv.data.profile.ProfileRepository
+import hu.gc.jegyzokonyv.data.profile.ProfileRepositoryImpl
 import hu.gc.jegyzokonyv.data.repo.DraftRepository
 import hu.gc.jegyzokonyv.data.repo.DraftRepositoryImpl
 import hu.gc.jegyzokonyv.data.repo.TemplateRepository
@@ -67,4 +69,8 @@ abstract class AppBindings {
     @Binds
     @Singleton
     abstract fun bindDraftRepository(impl: DraftRepositoryImpl): DraftRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindProfileRepository(impl: ProfileRepositoryImpl): ProfileRepository
 }
