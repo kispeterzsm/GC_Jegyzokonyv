@@ -9,7 +9,7 @@ Package: `hu.gc.jegyzokonyv` · Min SDK 26 · Kotlin + Jetpack Compose
 ## APK Download
 
 Latest debug APK:
-[`app-debug.apk`](https://github.com/kispeterzsm/GC_Jegyzokonyv/releases/download/v0.3.2/app-debug.apk)
+[`app-debug.apk`](https://github.com/kispeterzsm/GC_Jegyzokonyv/releases/download/v0.4.1/app-debug.apk)
 
 Install it on a connected Android device with:
 
