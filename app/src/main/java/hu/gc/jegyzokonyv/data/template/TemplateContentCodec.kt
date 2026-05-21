@@ -153,6 +153,7 @@ object TemplateContentCodec {
         editable?.let { put("editable", it) }
         put("hideIfEmpty", hideIfEmpty)
         put("mergeAll", mergeAll)
+        put("headerRow", headerRow)
     }
 
     private fun TableCellSettings.toJson() = JSONObject().apply {
@@ -182,6 +183,7 @@ object TemplateContentCodec {
             editable = if (has("editable")) optBoolean("editable") else null,
             hideIfEmpty = optBoolean("hideIfEmpty", false),
             mergeAll = optBoolean("mergeAll", false),
+            headerRow = optBoolean("headerRow", false),
         )
     }
 

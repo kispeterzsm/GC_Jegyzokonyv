@@ -66,6 +66,7 @@ data class TableAxisSettings(
     val editable: Boolean? = null,
     val hideIfEmpty: Boolean = false,
     val mergeAll: Boolean = false,
+    val headerRow: Boolean = false,
 )
 
 data class TableCellSettings(

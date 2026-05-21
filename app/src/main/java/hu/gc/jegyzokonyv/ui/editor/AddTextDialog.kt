@@ -13,6 +13,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hu.gc.jegyzokonyv.R
 
@@ -41,10 +42,20 @@ fun AddTextDialog(
             )
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(text) }) { Text(confirmLabel) }
+            TextButton(onClick = { onConfirm(text) }) { DialogButtonText(confirmLabel) }
         },
         dismissButton = dismissButton ?: {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+            TextButton(onClick = onDismiss) { DialogButtonText(stringResource(R.string.action_cancel)) }
         },
+    )
+}
+
+@Composable
+private fun DialogButtonText(text: String) {
+    Text(
+        text = text,
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Ellipsis,
     )
 }

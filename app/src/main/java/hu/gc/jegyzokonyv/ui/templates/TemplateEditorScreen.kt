@@ -73,6 +73,7 @@ import hu.gc.jegyzokonyv.domain.model.ProfileDataField
 import hu.gc.jegyzokonyv.domain.model.TableAxisSettings
 import hu.gc.jegyzokonyv.domain.model.TableCellSettings
 import hu.gc.jegyzokonyv.domain.model.TemplateBlock
+import hu.gc.jegyzokonyv.ui.common.ConfirmDialog
 import hu.gc.jegyzokonyv.ui.editor.EditorHtmlWebView
 import java.io.File
 import java.text.SimpleDateFormat
@@ -176,6 +177,10 @@ fun TemplateEditorScreen(
                         onAddFooter = viewModel::addFooterBlock,
                         onAddHeaderPageNumber = viewModel::addPageNumberToHeader,
                         onAddFooterPageNumber = viewModel::addPageNumberToFooter,
+                        onAddHeaderDate = viewModel::addDateToHeader,
+                        onAddFooterDate = viewModel::addDateToFooter,
+                        onAddHeaderProfileData = viewModel::addProfileDataToHeader,
+                        onAddFooterProfileData = viewModel::addProfileDataToFooter,
                         onAddHeaderText = viewModel::addHeaderTextBlock,
                         onAddFooterText = viewModel::addFooterTextBlock,
                         onAddHeaderTable = { showHeaderTableDialog = true },
@@ -312,6 +317,10 @@ private fun AddElementsSection(
     onAddFooter: () -> Unit,
     onAddHeaderPageNumber: () -> Unit,
     onAddFooterPageNumber: () -> Unit,
+    onAddHeaderDate: () -> Unit,
+    onAddFooterDate: () -> Unit,
+    onAddHeaderProfileData: (ProfileDataField) -> Unit,
+    onAddFooterProfileData: (ProfileDataField) -> Unit,
     onAddHeaderText: () -> Unit,
     onAddFooterText: () -> Unit,
     onAddHeaderTable: () -> Unit,
@@ -381,8 +390,30 @@ private fun AddElementsSection(
                         AddElementButton(text = "Táblázat láblécbe", icon = Icons.Filled.GridOn, onClick = onAddFooterTable, modifier = Modifier.weight(1f))
                     }
                     AddElementButtonRow {
+                        AddElementButton(text = "Dátum fejlécbe", icon = Icons.Filled.DateRange, onClick = onAddHeaderDate, modifier = Modifier.weight(1f))
+                        AddElementButton(text = "Dátum láblécbe", icon = Icons.Filled.DateRange, onClick = onAddFooterDate, modifier = Modifier.weight(1f))
+                    }
+                    AddElementButtonRow {
                         AddElementButton(text = "Oldalszám fejlécbe", icon = Icons.Filled.InsertPageBreak, onClick = onAddHeaderPageNumber, modifier = Modifier.weight(1f))
                         AddElementButton(text = "Oldalszám láblécbe", icon = Icons.Filled.InsertPageBreak, onClick = onAddFooterPageNumber, modifier = Modifier.weight(1f))
+                    }
+                    Text("Profil adatok fejlécbe", style = MaterialTheme.typography.titleSmall)
+                    AddElementButtonRow {
+                        AddElementButton(text = "Név fejlécbe", icon = Icons.Filled.Draw, onClick = { onAddHeaderProfileData(ProfileDataField.Name) }, modifier = Modifier.weight(1f))
+                        AddElementButton(text = "Cégnév fejlécbe", icon = Icons.Filled.Draw, onClick = { onAddHeaderProfileData(ProfileDataField.CompanyName) }, modifier = Modifier.weight(1f))
+                    }
+                    AddElementButtonRow {
+                        AddElementButton(text = "Telefon fejlécbe", icon = Icons.Filled.Draw, onClick = { onAddHeaderProfileData(ProfileDataField.Phone) }, modifier = Modifier.weight(1f))
+                        AddElementButton(text = "Email fejlécbe", icon = Icons.Filled.Draw, onClick = { onAddHeaderProfileData(ProfileDataField.Email) }, modifier = Modifier.weight(1f))
+                    }
+                    Text("Profil adatok láblécbe", style = MaterialTheme.typography.titleSmall)
+                    AddElementButtonRow {
+                        AddElementButton(text = "Név láblécbe", icon = Icons.Filled.Draw, onClick = { onAddFooterProfileData(ProfileDataField.Name) }, modifier = Modifier.weight(1f))
+                        AddElementButton(text = "Cégnév láblécbe", icon = Icons.Filled.Draw, onClick = { onAddFooterProfileData(ProfileDataField.CompanyName) }, modifier = Modifier.weight(1f))
+                    }
+                    AddElementButtonRow {
+                        AddElementButton(text = "Telefon láblécbe", icon = Icons.Filled.Draw, onClick = { onAddFooterProfileData(ProfileDataField.Phone) }, modifier = Modifier.weight(1f))
+                        AddElementButton(text = "Email láblécbe", icon = Icons.Filled.Draw, onClick = { onAddFooterProfileData(ProfileDataField.Email) }, modifier = Modifier.weight(1f))
                     }
                 }
                 AddElementPage.Photos -> {
@@ -411,6 +442,20 @@ private fun ProfileDataField.displayLabel(): String = when (this) {
 }
 
 @Composable
+private fun ButtonText(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = text,
+        modifier = modifier,
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+@Composable
 private fun AddElementPageButton(
     text: String,
     selected: Boolean,
@@ -418,9 +463,9 @@ private fun AddElementPageButton(
     modifier: Modifier = Modifier,
 ) {
     if (selected) {
-        Button(onClick = onClick, modifier = modifier.heightIn(min = 40.dp)) { Text(text) }
+        Button(onClick = onClick, modifier = modifier.heightIn(min = 40.dp)) { ButtonText(text) }
     } else {
-        OutlinedButton(onClick = onClick, modifier = modifier.heightIn(min = 40.dp)) { Text(text) }
+        OutlinedButton(onClick = onClick, modifier = modifier.heightIn(min = 40.dp)) { ButtonText(text) }
     }
 }
 
@@ -446,10 +491,9 @@ private fun AddElementButton(
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
     ) {
         Icon(imageVector = icon, contentDescription = null)
-        Text(
+        ButtonText(
             text = text,
             modifier = Modifier.padding(start = 8.dp),
-            style = MaterialTheme.typography.labelLarge,
         )
     }
 }
@@ -492,6 +536,7 @@ private fun BlockRow(
     var styleDialog by remember(block.id) { mutableStateOf<TableCellSettings?>(null) }
     var styleConfirm by remember(block.id) { mutableStateOf<(TableCellSettings) -> Unit>({}) }
     var tableDialog by remember(block.id) { mutableStateOf(false) }
+    var pendingDelete by remember(block.id) { mutableStateOf<(() -> Unit)?>(null) }
 
     val label = when (block) {
         is TemplateBlock.Text -> "Szöveg"
@@ -622,7 +667,7 @@ private fun BlockRow(
                     IconButton(onClick = onMoveUp) { Icon(Icons.Filled.ArrowUpward, contentDescription = stringResource(R.string.template_editor_block_move_up)) }
                     IconButton(onClick = onMoveDown) { Icon(Icons.Filled.ArrowDownward, contentDescription = stringResource(R.string.template_editor_block_move_down)) }
                     if (block !is TemplateBlock.Images) {
-                        IconButton(onClick = onRemove) { Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.template_editor_block_delete)) }
+                        IconButton(onClick = { pendingDelete = onRemove }) { Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.template_editor_block_delete)) }
                     }
                 }
             }
@@ -635,7 +680,7 @@ private fun BlockRow(
             onDismiss = { styleDialog = null },
             onDelete = {
                 styleDialog = null
-                onRemove()
+                pendingDelete = onRemove
             },
             onConfirm = {
                 styleDialog = null
@@ -650,7 +695,7 @@ private fun BlockRow(
             onDismiss = { tableDialog = false },
             onDelete = {
                 tableDialog = false
-                onRemove()
+                pendingDelete = onRemove
             },
             onCellTextChange = onTableCellTextChange,
             onRowSettingsChange = onTableRowSettingsChange,
@@ -660,6 +705,15 @@ private fun BlockRow(
             onInsertColumnRight = onInsertColumnRight,
             onDeleteRow = onDeleteRow,
             onDeleteColumn = onDeleteColumn,
+        )
+    }
+    pendingDelete?.let { deleteAction ->
+        DeleteConfirmationDialog(
+            onConfirm = {
+                pendingDelete = null
+                deleteAction()
+            },
+            onDismiss = { pendingDelete = null },
         )
     }
 }
@@ -702,10 +756,10 @@ private fun TableSettingsDialog(
                 )
             }
         },
-        confirmButton = { Button(onClick = onDismiss) { Text(stringResource(R.string.action_save)) } },
+        confirmButton = { Button(onClick = onDismiss) { ButtonText(stringResource(R.string.action_save)) } },
         dismissButton = {
             OutlinedButton(onClick = onDelete, enabled = !readOnly) {
-                Text(stringResource(R.string.template_editor_block_delete))
+                ButtonText(stringResource(R.string.template_editor_block_delete))
             }
         },
     )
@@ -730,13 +784,14 @@ private fun TableBlockEditor(
     var rowDialog by remember(block.id) { mutableStateOf<Int?>(null) }
     var columnDialog by remember(block.id) { mutableStateOf<Int?>(null) }
     var cellDialog by remember(block.id) { mutableStateOf<Pair<Int, Int>?>(null) }
+    var pendingDelete by remember(block.id) { mutableStateOf<(() -> Unit)?>(null) }
     val scrollHorizontally = columns > 5
     val horizontalScrollState = rememberScrollState()
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         BlockLabel(
             icon = Icons.Filled.GridOn,
-            text = "Táblázat: $rows sor × $columns oszlop" + if (block.hasHeaderColumn) ", fejléc oszloppal" else "",
+            text = "Táblázat: $rows sor × $columns oszlop" + if ((0 until rows).any { block.rowSettings.getOrNull(it)?.headerRow == true }) ", fejléc sorral" else if (block.hasHeaderColumn) ", fejléc oszloppal" else "",
         )
         Text(
             text = "Koppints az oszlop nyílra, sor nyílra vagy cellára a beállítások szerkesztéséhez.",
@@ -795,6 +850,7 @@ private fun TableBlockEditor(
             mergeEnabled = true,
             mergeText = "Sor celláinak összevonása",
             tickColorsEnabled = false,
+            headerRowEnabled = true,
             insertText = "Új sor beszúrása alá",
             deleteText = "Sor törlése",
             deleteEnabled = rows > 1,
@@ -804,7 +860,7 @@ private fun TableBlockEditor(
             },
             onDelete = {
                 rowDialog = null
-                onDeleteRow(row)
+                pendingDelete = { onDeleteRow(row) }
             },
             onDismiss = { rowDialog = null },
             onConfirm = {
@@ -820,6 +876,7 @@ private fun TableBlockEditor(
             mergeEnabled = (0 until rows).none { block.cellSettings.getOrNull(it)?.getOrNull(column)?.toggleCheck == true },
             mergeText = "Oszlop celláinak összevonása",
             tickColorsEnabled = (0 until rows).any { block.cellSettings.getOrNull(it)?.getOrNull(column)?.toggleCheck == true },
+            headerRowEnabled = false,
             insertText = "Új oszlop beszúrása jobbra",
             deleteText = "Oszlop törlése",
             deleteEnabled = columns > 1 && (0 until rows).none { block.cellSettings.getOrNull(it)?.getOrNull(column)?.toggleCheck == true },
@@ -829,7 +886,7 @@ private fun TableBlockEditor(
             },
             onDelete = {
                 columnDialog = null
-                onDeleteColumn(column)
+                pendingDelete = { onDeleteColumn(column) }
             },
             onDismiss = { columnDialog = null },
             onConfirm = {
@@ -850,6 +907,15 @@ private fun TableBlockEditor(
                 onCellTextChange(row, column, newText)
                 onCellSettingsChange(row, column, newSettings)
             },
+        )
+    }
+    pendingDelete?.let { deleteAction ->
+        DeleteConfirmationDialog(
+            onConfirm = {
+                pendingDelete = null
+                deleteAction()
+            },
+            onDismiss = { pendingDelete = null },
         )
     }
 }
@@ -908,6 +974,7 @@ private fun AxisSettingsDialog(
     mergeEnabled: Boolean,
     mergeText: String,
     tickColorsEnabled: Boolean,
+    headerRowEnabled: Boolean,
     insertText: String,
     deleteText: String,
     deleteEnabled: Boolean,
@@ -950,24 +1017,37 @@ private fun AxisSettingsDialog(
                     Checkbox(checked = draft.editable != false, onCheckedChange = { draft = draft.copy(editable = it) })
                     Text("Szerkeszthető cellák")
                 }
+                if (headerRowEnabled) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = draft.headerRow,
+                            onCheckedChange = { draft = draft.copy(headerRow = it, hideIfEmpty = if (it) false else draft.hideIfEmpty) },
+                        )
+                        Text("Legyen fejléc sor")
+                    }
+                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = draft.hideIfEmpty, onCheckedChange = { draft = draft.copy(hideIfEmpty = it) })
-                    Text("Eltűnik exportnál, ha az üres szerkeszthető cellák üresek")
+                    Checkbox(
+                        checked = draft.hideIfEmpty && !draft.headerRow,
+                        onCheckedChange = { draft = draft.copy(hideIfEmpty = it) },
+                        enabled = !draft.headerRow,
+                    )
+                    Text(if (draft.headerRow) "Fejléc sornál nem rejthető el" else "Eltűnik exportnál, ha az üres szerkeszthető cellák üresek")
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = draft.mergeAll && mergeEnabled, onCheckedChange = { draft = draft.copy(mergeAll = it) }, enabled = mergeEnabled)
                     Text(if (mergeEnabled) mergeText else "$mergeText (pipa oszlopnál nem elérhető)")
                 }
                 OutlinedButton(onClick = onInsert, modifier = Modifier.fillMaxWidth()) {
-                    Text(insertText)
+                    ButtonText(insertText)
                 }
                 OutlinedButton(onClick = onDelete, enabled = deleteEnabled, modifier = Modifier.fillMaxWidth()) {
-                    Text(if (deleteEnabled) deleteText else "$deleteText (nem elérhető)")
+                    ButtonText(if (deleteEnabled) deleteText else "$deleteText (nem elérhető)")
                 }
             }
         },
-        confirmButton = { Button(onClick = { onConfirm(draft) }) { Text(stringResource(R.string.action_save)) } },
-        dismissButton = { OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        confirmButton = { Button(onClick = { onConfirm(draft) }) { ButtonText(stringResource(R.string.action_save)) } },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { ButtonText(stringResource(R.string.action_cancel)) } },
     )
 }
 
@@ -996,8 +1076,8 @@ private fun CellSettingsDialog(
                 if (draft.toggleCheck) {
                     Text("Alapértelmezett érték", style = MaterialTheme.typography.labelLarge)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        OutlinedButton(onClick = { draftText = "X" }, modifier = Modifier.weight(1f)) { Text("X") }
-                        OutlinedButton(onClick = { draftText = "✓" }, modifier = Modifier.weight(1f)) { Text("✓") }
+                        OutlinedButton(onClick = { draftText = "X" }, modifier = Modifier.weight(1f)) { ButtonText("X") }
+                        OutlinedButton(onClick = { draftText = "✓" }, modifier = Modifier.weight(1f)) { ButtonText("✓") }
                     }
                 } else {
                     Row(
@@ -1012,7 +1092,7 @@ private fun CellSettingsDialog(
                             modifier = Modifier.weight(1f),
                         )
                         OutlinedButton(onClick = { showSpecialDialog = true }) {
-                            Text("Speciális")
+                            ButtonText("Speciális")
                         }
                     }
                 }
@@ -1056,8 +1136,8 @@ private fun CellSettingsDialog(
                 }
             }
         },
-        confirmButton = { Button(onClick = { onConfirm(draftText, draft) }) { Text(stringResource(R.string.action_save)) } },
-        dismissButton = { OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        confirmButton = { Button(onClick = { onConfirm(draftText, draft) }) { ButtonText(stringResource(R.string.action_save)) } },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { ButtonText(stringResource(R.string.action_cancel)) } },
     )
 
     if (showSpecialDialog) {
@@ -1090,13 +1170,13 @@ private fun SpecialCellElementDialog(
             }
         },
         confirmButton = {},
-        dismissButton = { OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { ButtonText(stringResource(R.string.action_cancel)) } },
     )
 }
 
 @Composable
 private fun SpecialElementButton(text: String, onClick: () -> Unit) {
-    OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) { Text(text) }
+    OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) { ButtonText(text) }
 }
 
 @Composable
@@ -1107,9 +1187,9 @@ private fun TextAlignPicker(value: String, onChange: (String) -> Unit) {
             listOf("left" to "Bal", "center" to "Közép", "right" to "Jobb").forEach { (align, label) ->
                 val selected = value == align || (value.isBlank() && align == "left")
                 if (selected) {
-                    Button(onClick = { onChange(align) }, modifier = Modifier.weight(1f)) { Text(label) }
+                    Button(onClick = { onChange(align) }, modifier = Modifier.weight(1f)) { ButtonText(label) }
                 } else {
-                    OutlinedButton(onClick = { onChange(align) }, modifier = Modifier.weight(1f)) { Text(label) }
+                    OutlinedButton(onClick = { onChange(align) }, modifier = Modifier.weight(1f)) { ButtonText(label) }
                 }
             }
         }
@@ -1167,10 +1247,10 @@ private fun ColorSettingButtons(
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             OutlinedButton(onClick = { expanded = if (expanded == ColorTarget.Background) null else ColorTarget.Background }, modifier = Modifier.weight(1f)) {
-                Text(backgroundLabel)
+                ButtonText(backgroundLabel)
             }
             OutlinedButton(onClick = { expanded = if (expanded == ColorTarget.Text) null else ColorTarget.Text }, modifier = Modifier.weight(1f)) {
-                Text(textLabel)
+                ButtonText(textLabel)
             }
         }
         when (expanded) {
@@ -1214,8 +1294,8 @@ private fun ColorPicker(title: String, emptyText: String, value: String, onChang
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            OutlinedButton(onClick = { onChange("") }, modifier = Modifier.weight(1f)) { Text(emptyText) }
-            OutlinedButton(onClick = { showCustom = !showCustom }, modifier = Modifier.weight(1f)) { Text("Egyedi szín") }
+            OutlinedButton(onClick = { onChange("") }, modifier = Modifier.weight(1f)) { ButtonText(emptyText) }
+            OutlinedButton(onClick = { showCustom = !showCustom }, modifier = Modifier.weight(1f)) { ButtonText("Egyedi szín") }
         }
         if (showCustom) {
             ColorSlider("Piros", customRed) {
@@ -1298,6 +1378,7 @@ private fun ContainerBlockLabel(
     var styleDialog by remember(title) { mutableStateOf<Pair<String, TableCellSettings>?>(null) }
     var styleConfirm by remember(title) { mutableStateOf<(String, TableCellSettings) -> Unit>({ _, _ -> }) }
     var tableDialogId by remember(title) { mutableStateOf<String?>(null) }
+    var pendingDelete by remember(title) { mutableStateOf<(() -> Unit)?>(null) }
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(title, style = MaterialTheme.typography.bodySmall)
@@ -1361,7 +1442,7 @@ private fun ContainerBlockLabel(
             onDismiss = { styleDialog = null },
             onDelete = {
                 styleDialog = null
-                onDeleteBlock(blockId)
+                pendingDelete = { onDeleteBlock(blockId) }
             },
             onConfirm = {
                 styleDialog = null
@@ -1380,7 +1461,7 @@ private fun ContainerBlockLabel(
                 onDismiss = { tableDialogId = null },
                 onDelete = {
                     tableDialogId = null
-                    onDeleteBlock(tableId)
+                    pendingDelete = { onDeleteBlock(tableId) }
                 },
                 onCellTextChange = { row, column, value -> onTableCellTextChange(tableId, row, column, value) },
                 onRowSettingsChange = { row, settings -> onTableRowSettingsChange(tableId, row, settings) },
@@ -1393,11 +1474,20 @@ private fun ContainerBlockLabel(
             )
         }
     }
+    pendingDelete?.let { deleteAction ->
+        DeleteConfirmationDialog(
+            onConfirm = {
+                pendingDelete = null
+                deleteAction()
+            },
+            onDismiss = { pendingDelete = null },
+        )
+    }
 }
 
 @Composable
 private fun StyledSettingsButton(readOnly: Boolean, onClick: () -> Unit) {
-    OutlinedButton(onClick = onClick, enabled = !readOnly) { Text("Szín és igazítás") }
+    OutlinedButton(onClick = onClick, enabled = !readOnly) { ButtonText("Szín és igazítás") }
 }
 
 @Composable
@@ -1434,13 +1524,27 @@ private fun StyledBlockSettingsDialog(
                 }
             }
         },
-        confirmButton = { Button(onClick = { onConfirm(draft) }) { Text(stringResource(R.string.action_save)) } },
+        confirmButton = { Button(onClick = { onConfirm(draft) }) { ButtonText(stringResource(R.string.action_save)) } },
         dismissButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onDelete) { Text(stringResource(R.string.template_editor_block_delete)) }
-                OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+                OutlinedButton(onClick = onDelete) { ButtonText(stringResource(R.string.template_editor_block_delete)) }
+                OutlinedButton(onClick = onDismiss) { ButtonText(stringResource(R.string.action_cancel)) }
             }
         },
+    )
+}
+
+@Composable
+private fun DeleteConfirmationDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ConfirmDialog(
+        title = stringResource(R.string.dialog_confirm_delete_title),
+        message = stringResource(R.string.dialog_confirm_delete_message),
+        confirmLabel = stringResource(R.string.action_delete),
+        onConfirm = onConfirm,
+        onDismiss = onDismiss,
     )
 }
 
@@ -1462,7 +1566,6 @@ private fun AddTableDialog(
 ) {
     var rows by remember { mutableStateOf("3") }
     var columns by remember { mutableStateOf("3") }
-    var headerColumn by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Táblázat hozzáadása") },
@@ -1470,19 +1573,16 @@ private fun AddTableDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(value = rows, onValueChange = { rows = it.filter(Char::isDigit) }, label = { Text("Sorok") }, singleLine = true)
                 OutlinedTextField(value = columns, onValueChange = { columns = it.filter(Char::isDigit) }, label = { Text("Oszlopok") }, singleLine = true)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = headerColumn, onCheckedChange = { headerColumn = it })
-                    Text("Legyen fejléc oszlop")
-                }
+                Text("Fejléc sort a táblázat beállításainál, a sor nyíl gombjára koppintva adhatsz meg.", style = MaterialTheme.typography.bodySmall)
             }
         },
         confirmButton = {
-            Button(onClick = { onConfirm(rows.toIntOrNull() ?: 1, columns.toIntOrNull() ?: 1, headerColumn) }) {
-                Text(stringResource(R.string.action_create))
+            Button(onClick = { onConfirm(rows.toIntOrNull() ?: 1, columns.toIntOrNull() ?: 1, false) }) {
+                ButtonText(stringResource(R.string.action_create))
             }
         },
         dismissButton = {
-            OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+            OutlinedButton(onClick = onDismiss) { ButtonText(stringResource(R.string.action_cancel)) }
         },
     )
 }
@@ -1510,11 +1610,11 @@ private fun AddChecklistDialog(
         },
         confirmButton = {
             Button(onClick = { onConfirm(rows.toIntOrNull() ?: 1, columns.toIntOrNull() ?: 1, tickColumnFirst) }) {
-                Text(stringResource(R.string.action_create))
+                ButtonText(stringResource(R.string.action_create))
             }
         },
         dismissButton = {
-            OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+            OutlinedButton(onClick = onDismiss) { ButtonText(stringResource(R.string.action_cancel)) }
         },
     )
 }

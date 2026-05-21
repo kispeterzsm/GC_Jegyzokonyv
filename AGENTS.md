@@ -1,0 +1,1 @@
+use build-pk.sh to build the project. use the debug option to see debug messages

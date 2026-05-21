@@ -139,7 +139,7 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
         repeat(rows) { rowIndex ->
             val row = table.appendElement("tr")
             val rowSettings = block.rowSettings.getOrNull(rowIndex) ?: TableAxisSettings()
-            if (rowSettings.hideIfEmpty) row.attr("data-hide-if-empty", "true")
+            if (rowSettings.hideIfEmpty && !rowSettings.headerRow) row.attr("data-hide-if-empty", "true")
             val rowMergeColumns = if (rowSettings.mergeAll) (0 until columns).filter { col -> !block.tableCellSettings(rowIndex, col).toggleCheck } else emptyList()
             repeat(columns) { colIndex ->
                 if (rowIndex to colIndex in skipped) return@repeat
@@ -162,7 +162,7 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
                         skipped += rowIndex to (colIndex + 1)
                     }
                 }
-                val cell = if (block.hasHeaderColumn && colIndex == 0) row.appendElement("th") else row.appendElement("td")
+                val cell = if (rowSettings.headerRow || (block.hasHeaderColumn && colIndex == 0)) row.appendElement("th") else row.appendElement("td")
                 if (colSpan > 1) cell.attr("colspan", colSpan.toString())
                 if (rowSpan > 1) cell.attr("rowspan", rowSpan.toString())
                 val editable = !cellSettings.toggleCheck && (cellSettings.editable ?: rowSettings.editable ?: columnSettings.editable ?: true)

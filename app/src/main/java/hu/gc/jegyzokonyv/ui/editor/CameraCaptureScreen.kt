@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -108,7 +109,7 @@ fun CameraCaptureScreen(
                 title = { Text(stringResource(R.string.editor_add_photo)) },
                 navigationIcon = {
                     TextButton(onClick = onCancel) {
-                        Text(stringResource(R.string.action_cancel))
+                        CameraButtonText(stringResource(R.string.action_cancel))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -181,9 +182,19 @@ private fun PermissionRationale(onRequest: () -> Unit) {
                 .padding(top = 16.dp)
                 .heightIn(min = 56.dp),
         ) {
-            Text(stringResource(R.string.camera_permission_grant))
+            CameraButtonText(stringResource(R.string.camera_permission_grant))
         }
     }
+}
+
+@Composable
+private fun CameraButtonText(text: String) {
+    Text(
+        text = text,
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 @Composable

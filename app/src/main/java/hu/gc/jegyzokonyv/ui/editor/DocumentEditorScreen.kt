@@ -56,6 +56,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -349,7 +350,7 @@ private fun BottomActionBar(
             ) {
                 Icon(Icons.Filled.Camera, contentDescription = null)
                 Spacer(Modifier.size(8.dp))
-                Text(stringResource(R.string.editor_add_photo))
+                EditorButtonText(stringResource(R.string.editor_add_photo))
             }
             if (!canAddText) {
                 OutlinedButton(
@@ -371,7 +372,7 @@ private fun BottomActionBar(
                         contentDescription = null,
                     )
                     Spacer(Modifier.size(8.dp))
-                    Text(
+                    EditorButtonText(
                         stringResource(
                             if (isDictating) {
                                 R.string.editor_dictation_listening
@@ -391,7 +392,7 @@ private fun BottomActionBar(
                 ) {
                     Icon(Icons.Filled.Edit, contentDescription = null)
                     Spacer(Modifier.size(8.dp))
-                    Text(stringResource(R.string.editor_add_text))
+                    EditorButtonText(stringResource(R.string.editor_add_text))
                 }
             }
         }
@@ -439,6 +440,16 @@ private fun rememberOnDeviceHungarianSpeechRecognizer(
             }
         }
     }
+}
+
+@Composable
+private fun EditorButtonText(text: String) {
+    Text(
+        text = text,
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 private fun hungarianSpeechIntent(): Intent =

@@ -129,11 +129,11 @@ class TemplateEditorViewModel @Inject constructor(
     }
 
     fun onTableRowSettingsChange(id: String, row: Int, settings: TableAxisSettings) = updateTable(id) { table ->
-        table.copy(rowSettings = table.normalizedRowSettings().mapIndexed { index, value -> if (index == row) settings else value })
+        table.applyRowSettings(row, settings)
     }
 
     fun onTableColumnSettingsChange(id: String, column: Int, settings: TableAxisSettings) = updateTable(id) { table ->
-        table.copy(columnSettings = table.normalizedColumnSettings().mapIndexed { index, value -> if (index == column) settings else value })
+        table.applyColumnSettings(column, settings)
     }
 
     fun onTableCellSettingsChange(id: String, row: Int, column: Int, settings: TableCellSettings) = updateTable(id) { table ->
@@ -188,11 +188,11 @@ class TemplateEditorViewModel @Inject constructor(
     }
 
     fun onNestedTableRowSettingsChange(containerId: String, tableId: String, row: Int, settings: TableAxisSettings) = updateNestedTable(containerId, tableId) { table ->
-        table.copy(rowSettings = table.normalizedRowSettings().mapIndexed { index, value -> if (index == row) settings else value })
+        table.applyRowSettings(row, settings)
     }
 
     fun onNestedTableColumnSettingsChange(containerId: String, tableId: String, column: Int, settings: TableAxisSettings) = updateNestedTable(containerId, tableId) { table ->
-        table.copy(columnSettings = table.normalizedColumnSettings().mapIndexed { index, value -> if (index == column) settings else value })
+        table.applyColumnSettings(column, settings)
     }
 
     fun onNestedTableCellSettingsChange(containerId: String, tableId: String, row: Int, column: Int, settings: TableCellSettings) = updateNestedTable(containerId, tableId) { table ->
@@ -266,6 +266,10 @@ class TemplateEditorViewModel @Inject constructor(
 
     fun addPageNumberToHeader() = addBlockToContainer(header = true, TemplateBlock.PageNumber(id = UUID.randomUUID().toString()))
     fun addPageNumberToFooter() = addBlockToContainer(header = false, TemplateBlock.PageNumber(id = UUID.randomUUID().toString()))
+    fun addDateToHeader() = addBlockToContainer(header = true, TemplateBlock.Date(id = UUID.randomUUID().toString()))
+    fun addDateToFooter() = addBlockToContainer(header = false, TemplateBlock.Date(id = UUID.randomUUID().toString()))
+    fun addProfileDataToHeader(field: ProfileDataField) = addBlockToContainer(header = true, TemplateBlock.ProfileData(id = UUID.randomUUID().toString(), field = field))
+    fun addProfileDataToFooter(field: ProfileDataField) = addBlockToContainer(header = false, TemplateBlock.ProfileData(id = UUID.randomUUID().toString(), field = field))
     fun addHeaderTextBlock() = addBlockToContainer(header = true, TemplateBlock.Text(id = UUID.randomUUID().toString(), text = ""))
     fun addFooterTextBlock() = addBlockToContainer(header = false, TemplateBlock.Text(id = UUID.randomUUID().toString(), text = ""))
     fun addHeaderTableBlock(rows: Int, columns: Int, hasHeaderColumn: Boolean) = addBlockToContainer(header = true, newTableBlock(rows, columns, hasHeaderColumn))
@@ -499,6 +503,42 @@ class TemplateEditorViewModel @Inject constructor(
 
     private fun TemplateBlock.Table.normalizedCellSettings(): List<List<TableCellSettings>> =
         List(rows.coerceIn(1, 50)) { row -> List(columns.coerceIn(1, 20)) { column -> cellSettings.getOrNull(row)?.getOrNull(column) ?: TableCellSettings() } }
+
+    private fun TemplateBlock.Table.applyRowSettings(row: Int, settings: TableAxisSettings): TemplateBlock.Table {
+        val safeRow = row.coerceIn(0, rows.coerceIn(1, 50) - 1)
+        val safeSettings = if (settings.headerRow) settings.copy(hideIfEmpty = false) else settings
+        return copy(
+            rowSettings = normalizedRowSettings().mapIndexed { index, value -> if (index == safeRow) safeSettings else value },
+            cellSettings = normalizedCellSettings().mapIndexed { rowIndex, values ->
+                if (rowIndex == safeRow) values.map { it.withAxisSettings(safeSettings) } else values
+            },
+        )
+    }
+
+    private fun TemplateBlock.Table.applyColumnSettings(column: Int, settings: TableAxisSettings): TemplateBlock.Table {
+        val safeColumn = column.coerceIn(0, columns.coerceIn(1, 20) - 1)
+        return copy(
+            columnSettings = normalizedColumnSettings().mapIndexed { index, value -> if (index == safeColumn) settings else value },
+            cellSettings = normalizedCellSettings().mapIndexed { rowIndex, values ->
+                val isHeaderRow = rowSettings.getOrNull(rowIndex)?.headerRow == true
+                values.mapIndexed { columnIndex, value ->
+                    if (columnIndex == safeColumn) value.withAxisSettings(settings, keepVisible = isHeaderRow) else value
+                }
+            },
+        )
+    }
+
+    private fun TableCellSettings.withAxisSettings(settings: TableAxisSettings, keepVisible: Boolean = false): TableCellSettings = copy(
+        backgroundColor = settings.backgroundColor,
+        textColor = settings.textColor,
+        textAlign = settings.textAlign,
+        tickXBackgroundColor = settings.tickXBackgroundColor,
+        tickXTextColor = settings.tickXTextColor,
+        tickCheckedBackgroundColor = settings.tickCheckedBackgroundColor,
+        tickCheckedTextColor = settings.tickCheckedTextColor,
+        editable = settings.editable,
+        hideIfEmpty = settings.hideIfEmpty && !settings.headerRow && !keepVisible,
+    )
 
     private fun moveBlock(id: String, offset: Int) {
         if (_state.value.isReadOnly) return
