@@ -109,6 +109,7 @@ class ExportPdfUseCase @Inject constructor(
 
     private fun MutableList<ExportBlock>.addExportBlocksFromElement(element: Element, draftDir: File) {
         when {
+            element.hasClass("image-page") -> addImagePageExportBlock(element, draftDir)
             element.hasClass("photo-block") -> addPhotoExportBlock(element, draftDir)
             element.hasClass("images-block") -> element.children().filterNot { it.hasClass("image-page-template") }.forEach { addExportBlocksFromElement(it, draftDir) }
             element.hasClass("date-block") -> blockText(element)?.let { add(element.toExportTextBlock(it, TextBlockStyle.Date)) }
@@ -227,6 +228,13 @@ class ExportPdfUseCase @Inject constructor(
                 else -> Color.parseColor(color)
             }
         }.getOrNull()
+    }
+
+    private fun MutableList<ExportBlock>.addImagePageExportBlock(element: Element, draftDir: File) {
+        val children = buildList {
+            element.children().forEach { addExportBlocksFromElement(it, draftDir) }
+        }
+        if (children.isNotEmpty()) add(ExportBlock.Group(children))
     }
 
     private fun MutableList<ExportBlock>.addPhotoExportBlock(element: Element, draftDir: File) {
@@ -817,6 +825,7 @@ class ExportPdfUseCase @Inject constructor(
         private var allowPagination = true
         private var repeatBottomY = PAGE_BOTTOM_PT
         private val currentBottomY: Float get() = if (allowPagination) bottomContentY else repeatBottomY
+        private var reservedSpaceAfterPhoto = 0f
         private var imageCount = 0
 
         private val titlePaint = textPaint(
@@ -868,6 +877,7 @@ class ExportPdfUseCase @Inject constructor(
                     is ExportBlock.Photo -> drawPhotoBlock(block)
                     is ExportBlock.Table -> drawTableBlock(block)
                     is ExportBlock.ProfileImage -> drawProfileImageBlock(block)
+                    is ExportBlock.Group -> drawGroupBlock(block)
                     is ExportBlock.PageBreak -> startPage()
                     is ExportBlock.PageNumber -> drawPageNumber(block, spacingAfter = 10f)
                 }
@@ -963,6 +973,41 @@ class ExportPdfUseCase @Inject constructor(
             canvas.restore()
         }
 
+        private fun drawGroupBlock(block: ExportBlock.Group) {
+            val estimatedHeight = block.blocks.sumOf { estimateBlockHeight(it).toDouble() }.toFloat()
+            if (y + estimatedHeight > currentBottomY && y > topContentY && allowPagination) startPage()
+            block.blocks.forEachIndexed { index, child ->
+                val originalReserved = reservedSpaceAfterPhoto
+                if (child is ExportBlock.Photo) {
+                    reservedSpaceAfterPhoto = block.blocks.drop(index + 1).sumOf { estimateBlockHeight(it).toDouble() }.toFloat()
+                }
+                drawBlock(child)
+                reservedSpaceAfterPhoto = originalReserved
+            }
+        }
+
+        private fun drawBlock(block: ExportBlock) {
+            when (block) {
+                is ExportBlock.Text -> drawTextBlock(block)
+                is ExportBlock.Photo -> drawPhotoBlock(block)
+                is ExportBlock.Table -> drawTableBlock(block)
+                is ExportBlock.ProfileImage -> drawProfileImageBlock(block)
+                is ExportBlock.Group -> drawGroupBlock(block)
+                is ExportBlock.PageBreak -> if (allowPagination) startPage()
+                is ExportBlock.PageNumber -> drawPageNumber(block, spacingAfter = 10f)
+            }
+        }
+
+        private fun estimateBlockHeight(block: ExportBlock): Float = when (block) {
+            is ExportBlock.Text -> staticLayout(block.text, if (block.style == TextBlockStyle.Date) datePaint else bodyPaint, CONTENT_WIDTH_PT.roundToInt()).height + 10f
+            is ExportBlock.Table -> block.rows.count { it.isNotEmpty() } * 28f + 12f
+            is ExportBlock.ProfileImage -> (if (block.signature) 70f else 95f) + 24f
+            is ExportBlock.Photo -> 220f + (block.caption?.let { staticLayout(it, captionPaint, CONTENT_WIDTH_PT.roundToInt()).height.toFloat() + 5f } ?: 0f) + 12f
+            is ExportBlock.Group -> block.blocks.sumOf { estimateBlockHeight(it).toDouble() }.toFloat()
+            is ExportBlock.PageBreak -> 0f
+            is ExportBlock.PageNumber -> staticLayout(pageNumber.toString(), bodyPaint, CONTENT_WIDTH_PT.roundToInt()).height + 10f
+        }
+
         private fun drawProfileImageBlock(block: ExportBlock.ProfileImage) {
             val image = block.image ?: run {
                 if (block.label.isNotBlank()) drawWrappedText(block.label, bodyPaint, spacingAfter = 12f)
@@ -1011,7 +1056,7 @@ class ExportPdfUseCase @Inject constructor(
 
             var drawWidth = CONTENT_WIDTH_PT
             var drawHeight = drawWidth * displaySize.height.toFloat() / displaySize.width.toFloat()
-            val maxImageHeight = (currentBottomY - topContentY) - captionGap - captionHeight
+            val maxImageHeight = ((currentBottomY - topContentY - reservedSpaceAfterPhoto) - captionGap - captionHeight).coerceAtLeast(96f)
             if (drawHeight > maxImageHeight) {
                 val scale = maxImageHeight / drawHeight
                 drawWidth *= scale
@@ -1221,6 +1266,7 @@ class ExportPdfUseCase @Inject constructor(
                         val paint = TextPaint(bodyPaint).apply { block.textColor?.let { color = it } }
                         drawWrappedText(currentPageNumber.toString(), paint, spacingAfter = 4f, backgroundColor = block.backgroundColor, textAlign = block.textAlign)
                     }
+                    is ExportBlock.Group -> drawGroupBlock(block)
                     is ExportBlock.ProfileImage, is ExportBlock.Photo, is ExportBlock.PageBreak -> Unit
                 }
             }
@@ -1313,6 +1359,8 @@ class ExportPdfUseCase @Inject constructor(
             val label: String,
             val signature: Boolean,
         ) : ExportBlock()
+
+        data class Group(val blocks: List<ExportBlock>) : ExportBlock()
 
         data object PageBreak : ExportBlock()
         data class PageNumber(

@@ -104,13 +104,21 @@ private fun injectEditBridge(html: String): String {
     val hasEditableContent = html.contains("contenteditable=\"true\"")
     val hasToggleChecks = html.contains("data-toggle-check=\"true\"")
     val hasImagePreviews = html.contains("data-editor-image-preview=\"true\"")
-    if (!hasEditableContent && !hasToggleChecks && !hasImagePreviews) return html
+    val hasExportGuides = html.contains("repeat-header") || html.contains("repeat-footer") || html.contains("template-page-break")
+    if (!hasEditableContent && !hasToggleChecks && !hasImagePreviews && !hasExportGuides) return html
     val cleanHtml = html
         .replace(Regex("""(?s)<script data-editor-bridge="true">.*?</script>"""), "")
         .replace(Regex("""(?s)<style data-editor-runtime="true">.*?</style>"""), "")
     val runtimeStyle = """
         <style data-editor-runtime="true">
           @media screen {
+            .repeat-header, .repeat-footer { display: block !important; margin: 10px 0 !important; padding: 8px !important; border: 1px dashed #6b7280 !important; background: #f8fafc !important; }
+            .repeat-header::before, .repeat-footer::before { display: block; margin-bottom: 6px; color: #475569; font-size: 11px; font-weight: 600; }
+            .repeat-header::before { content: "Ismétlődő fejléc"; }
+            .repeat-footer::before { content: "Ismétlődő lábléc"; }
+            .template-page-break { position: relative !important; height: 1px !important; margin: 18px 0 !important; border-top: 1px dashed #999 !important; }
+            .template-page-break::after { content: "Oldaltörés"; position: relative; top: -9px; left: 50%; transform: translateX(-50%); display: inline-block; background: #fff; color: #666; font-size: 11px; padding: 0 6px; }
+            .image-page { break-inside: avoid; page-break-inside: avoid; }
             body.safety-walkthrough { font-size: 10px !important; }
             body.safety-walkthrough .safety-page { min-height: auto !important; padding: 12px 8px 18px !important; }
             body.safety-walkthrough .safety-header { margin-bottom: 8px !important; }

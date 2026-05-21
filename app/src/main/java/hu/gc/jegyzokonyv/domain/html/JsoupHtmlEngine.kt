@@ -498,7 +498,9 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
               .stamp-image { max-width: 160px; max-height: 100px; object-fit: contain; }
               .images-block { margin: 12px 0; min-height: 36px; }
               .images-placeholder { margin: 0; padding: 10px; border: 1px dashed #777; color: #666; text-align: center; }
-              .template-page-break { break-after: page; page-break-after: always; height: 1px; margin: 18px 0; border-top: 1px dashed #999; }
+              .image-page { break-inside: avoid; page-break-inside: avoid; }
+              .template-page-break { break-after: page; page-break-after: always; height: 1px; margin: 18px 0; border-top: 1px dashed #999; position: relative; }
+              @media screen { .template-page-break::after { content: "Oldaltörés"; position: relative; top: -9px; left: 50%; transform: translateX(-50%); display: inline-block; background: #fff; color: #666; font-size: 11px; padding: 0 6px; } .repeat-header, .repeat-footer { display: block; margin: 10px 0; padding: 8px; border: 1px dashed #6b7280; background: #f8fafc; } .repeat-header::before, .repeat-footer::before { display: block; margin-bottom: 6px; color: #475569; font-size: 11px; font-weight: 600; } .repeat-header::before { content: "Ismétlődő fejléc"; } .repeat-footer::before { content: "Ismétlődő lábléc"; } }
               [contenteditable="true"] { min-height: 20px; outline: 1px dashed transparent; }
               [contenteditable="true"]:focus { outline-color: #555; background: #fffde7; }
             </style>
@@ -566,7 +568,9 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
               .observation-table td { min-height: 24px; white-space: pre-wrap; overflow-wrap: anywhere; }
               .images-block { margin: 12px 0; min-height: 36px; }
               .images-placeholder { margin: 0; padding: 10px; border: 1px dashed #777; color: #666; text-align: center; }
-              .template-page-break { break-after: page; page-break-after: always; height: 1px; margin: 18px 0; border-top: 1px dashed #999; }
+              .image-page { break-inside: avoid; page-break-inside: avoid; }
+              .template-page-break { break-after: page; page-break-after: always; height: 1px; margin: 18px 0; border-top: 1px dashed #999; position: relative; }
+              @media screen { .template-page-break::after { content: "Oldaltörés"; position: relative; top: -9px; left: 50%; transform: translateX(-50%); display: inline-block; background: #fff; color: #666; font-size: 11px; padding: 0 6px; } .repeat-header, .repeat-footer { display: block; margin: 10px 0; padding: 8px; border: 1px dashed #6b7280; background: #f8fafc; } .repeat-header::before, .repeat-footer::before { display: block; margin-bottom: 6px; color: #475569; font-size: 11px; font-weight: 600; } .repeat-header::before { content: "Ismétlődő fejléc"; } .repeat-footer::before { content: "Ismétlődő lábléc"; } }
               [contenteditable="true"] { min-height: 20px; outline: 1px dashed transparent; scroll-margin: 96px 0 24px; }
               [contenteditable="true"]:focus { outline-color: #555; background: #fffde7; }
               @media screen {
