@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.GridOn
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.InsertPageBreak
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -91,7 +92,11 @@ fun TemplateEditorScreen(
     val previewDir = remember { File(context.cacheDir, "template-preview").apply { mkdirs() } }
     val todayIso = remember { SimpleDateFormat("yyyy-MM-dd", Locale("hu", "HU")).format(Date()) }
     var showTableDialog by remember { mutableStateOf(false) }
+    var showHeaderTableDialog by remember { mutableStateOf(false) }
+    var showFooterTableDialog by remember { mutableStateOf(false) }
+    var showImageTableDialog by remember { mutableStateOf(false) }
     var showChecklistDialog by remember { mutableStateOf(false) }
+    val previewHtml = remember(state, todayIso) { viewModel.previewHtml(todayIso) }
 
     Scaffold(
         topBar = {
@@ -151,19 +156,6 @@ fun TemplateEditorScreen(
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            item("title") {
-                OutlinedTextField(
-                    value = state.title,
-                    onValueChange = viewModel::onTitleChange,
-                    label = { Text(stringResource(R.string.template_editor_title_hint)) },
-                    supportingText = {
-                        Text(stringResource(R.string.template_editor_title_helper))
-                    },
-                    singleLine = true,
-                    enabled = !state.isReadOnly,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
             if (!state.isReadOnly) {
                 item("add-elements") {
                     AddElementsSection(
@@ -173,7 +165,18 @@ fun TemplateEditorScreen(
                         onAddSignature = viewModel::addSignatureBlock,
                         onAddStamp = viewModel::addStampBlock,
                         onAddPageBreak = viewModel::addPageBreakBlock,
-                        onAddHeader = viewModel::addSafetyHeaderBlock,
+                        onAddHeader = viewModel::addHeaderBlock,
+                        onAddFooter = viewModel::addFooterBlock,
+                        onAddHeaderPageNumber = viewModel::addPageNumberToHeader,
+                        onAddFooterPageNumber = viewModel::addPageNumberToFooter,
+                        onAddHeaderText = viewModel::addHeaderTextBlock,
+                        onAddFooterText = viewModel::addFooterTextBlock,
+                        onAddHeaderTable = { showHeaderTableDialog = true },
+                        onAddFooterTable = { showFooterTableDialog = true },
+                        onAddImageText = viewModel::addImageTextBlock,
+                        onAddImageDate = viewModel::addImageDateBlock,
+                        onAddImageTable = { showImageTableDialog = true },
+                        onAddImagePageNumber = viewModel::addImagePageNumberBlock,
                         onAddChecklist = { showChecklistDialog = true },
                     )
                 }
@@ -183,6 +186,24 @@ fun TemplateEditorScreen(
                     block = block,
                     readOnly = state.isReadOnly,
                     onTextChange = { value -> viewModel.onTextBlockChange(block.id, value) },
+                    onTextSettingsChange = { settings -> viewModel.onTextBlockSettingsChange(block.id, settings) },
+                    onDateSettingsChange = { settings -> viewModel.onDateBlockSettingsChange(block.id, settings) },
+                    onPageNumberSettingsChange = { settings -> viewModel.onPageNumberBlockSettingsChange(block.id, settings) },
+                    onNestedTextChange = { childId, value -> viewModel.onNestedTextBlockChange(block.id, childId, value) },
+                    onNestedTextSettingsChange = { childId, settings -> viewModel.onNestedTextBlockSettingsChange(block.id, childId, settings) },
+                    onNestedDateSettingsChange = { childId, settings -> viewModel.onNestedDateBlockSettingsChange(block.id, childId, settings) },
+                    onNestedPageNumberSettingsChange = { childId, settings -> viewModel.onNestedPageNumberBlockSettingsChange(block.id, childId, settings) },
+                    onNestedRemove = { childId -> viewModel.removeNestedBlock(block.id, childId) },
+                    onNestedMoveUp = { childId -> viewModel.moveNestedBlockUp(block.id, childId) },
+                    onNestedMoveDown = { childId -> viewModel.moveNestedBlockDown(block.id, childId) },
+                    onNestedTableCellTextChange = { tableId, row, column, value -> viewModel.onNestedTableCellTextChange(block.id, tableId, row, column, value) },
+                    onNestedTableRowSettingsChange = { tableId, row, settings -> viewModel.onNestedTableRowSettingsChange(block.id, tableId, row, settings) },
+                    onNestedTableColumnSettingsChange = { tableId, column, settings -> viewModel.onNestedTableColumnSettingsChange(block.id, tableId, column, settings) },
+                    onNestedTableCellSettingsChange = { tableId, row, column, settings -> viewModel.onNestedTableCellSettingsChange(block.id, tableId, row, column, settings) },
+                    onNestedInsertRowBelow = { tableId, row -> viewModel.insertNestedTableRowBelow(block.id, tableId, row) },
+                    onNestedInsertColumnRight = { tableId, column -> viewModel.insertNestedTableColumnRight(block.id, tableId, column) },
+                    onNestedDeleteRow = { tableId, row -> viewModel.deleteNestedTableRow(block.id, tableId, row) },
+                    onNestedDeleteColumn = { tableId, column -> viewModel.deleteNestedTableColumn(block.id, tableId, column) },
                     onTableCellTextChange = { row, column, value -> viewModel.onTableCellTextChange(block.id, row, column, value) },
                     onTableRowSettingsChange = { row, settings -> viewModel.onTableRowSettingsChange(block.id, row, settings) },
                     onTableColumnSettingsChange = { column, settings -> viewModel.onTableColumnSettingsChange(block.id, column, settings) },
@@ -207,7 +228,7 @@ fun TemplateEditorScreen(
                             tonalElevation = 1.dp,
                         ) {
                             EditorHtmlWebView(
-                                html = viewModel.previewHtml(todayIso),
+                                html = previewHtml,
                                 draftDir = previewDir,
                                 onHtmlChanged = viewModel::onPreviewHtmlChanged,
                                 onEditableCellFocusedChanged = {},
@@ -233,6 +254,33 @@ fun TemplateEditorScreen(
         )
     }
 
+    if (showHeaderTableDialog) {
+        AddTableDialog(
+            onDismiss = { showHeaderTableDialog = false },
+            onConfirm = { rows, columns, header ->
+                showHeaderTableDialog = false
+                viewModel.addHeaderTableBlock(rows, columns, header)
+            },
+        )
+    }
+    if (showFooterTableDialog) {
+        AddTableDialog(
+            onDismiss = { showFooterTableDialog = false },
+            onConfirm = { rows, columns, header ->
+                showFooterTableDialog = false
+                viewModel.addFooterTableBlock(rows, columns, header)
+            },
+        )
+    }
+    if (showImageTableDialog) {
+        AddTableDialog(
+            onDismiss = { showImageTableDialog = false },
+            onConfirm = { rows, columns, header ->
+                showImageTableDialog = false
+                viewModel.addImageTableBlock(rows, columns, header)
+            },
+        )
+    }
     if (showChecklistDialog) {
         AddChecklistDialog(
             onDismiss = { showChecklistDialog = false },
@@ -253,6 +301,17 @@ private fun AddElementsSection(
     onAddStamp: () -> Unit,
     onAddPageBreak: () -> Unit,
     onAddHeader: () -> Unit,
+    onAddFooter: () -> Unit,
+    onAddHeaderPageNumber: () -> Unit,
+    onAddFooterPageNumber: () -> Unit,
+    onAddHeaderText: () -> Unit,
+    onAddFooterText: () -> Unit,
+    onAddHeaderTable: () -> Unit,
+    onAddFooterTable: () -> Unit,
+    onAddImageText: () -> Unit,
+    onAddImageDate: () -> Unit,
+    onAddImageTable: () -> Unit,
+    onAddImagePageNumber: () -> Unit,
     onAddChecklist: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -262,68 +321,83 @@ private fun AddElementsSection(
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            var page by remember { mutableStateOf(AddElementPage.Default) }
             Text("Elem hozzáadása", style = MaterialTheme.typography.titleMedium)
             Text(
                 text = "Válassz egy elemet. A táblázatok és mezők tartalmát az előnézetben érintéssel lehet kitölteni.",
                 style = MaterialTheme.typography.bodySmall,
             )
             AddElementButtonRow {
-                AddElementButton(
-                    text = stringResource(R.string.template_editor_add_text_block),
-                    icon = Icons.Filled.Draw,
-                    onClick = onAddText,
-                    modifier = Modifier.weight(1f),
-                )
-                AddElementButton(
-                    text = stringResource(R.string.template_editor_add_date_block),
-                    icon = Icons.Filled.DateRange,
-                    onClick = onAddDate,
-                    modifier = Modifier.weight(1f),
-                )
+                AddElementPageButton("Alap", selected = page == AddElementPage.Default, onClick = { page = AddElementPage.Default }, modifier = Modifier.weight(1f))
+                AddElementPageButton("Fejléc/lábléc", selected = page == AddElementPage.HeaderFooter, onClick = { page = AddElementPage.HeaderFooter }, modifier = Modifier.weight(1f))
+                AddElementPageButton("Fotók", selected = page == AddElementPage.Photos, onClick = { page = AddElementPage.Photos }, modifier = Modifier.weight(1f))
             }
-            AddElementButtonRow {
-                AddElementButton(
-                    text = "Táblázat",
-                    icon = Icons.Filled.GridOn,
-                    onClick = onAddTable,
-                    modifier = Modifier.weight(1f),
-                )
-                AddElementButton(
-                    text = "Pipálható lista",
-                    icon = Icons.Filled.Check,
-                    onClick = onAddChecklist,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            AddElementButtonRow {
-                AddElementButton(
-                    text = "Aláírás",
-                    icon = Icons.Filled.Draw,
-                    onClick = onAddSignature,
-                    modifier = Modifier.weight(1f),
-                )
-                AddElementButton(
-                    text = "Bélyegző",
-                    icon = Icons.Filled.Check,
-                    onClick = onAddStamp,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            AddElementButtonRow {
-                AddElementButton(
-                    text = "Fejléc",
-                    icon = Icons.Filled.GridOn,
-                    onClick = onAddHeader,
-                    modifier = Modifier.weight(1f),
-                )
-                AddElementButton(
-                    text = "Oldaltörés",
-                    icon = Icons.Filled.InsertPageBreak,
-                    onClick = onAddPageBreak,
-                    modifier = Modifier.weight(1f),
-                )
+            when (page) {
+                AddElementPage.Default -> {
+                    AddElementButtonRow {
+                        AddElementButton(text = stringResource(R.string.template_editor_add_text_block), icon = Icons.Filled.Draw, onClick = onAddText, modifier = Modifier.weight(1f))
+                        AddElementButton(text = stringResource(R.string.template_editor_add_date_block), icon = Icons.Filled.DateRange, onClick = onAddDate, modifier = Modifier.weight(1f))
+                    }
+                    AddElementButtonRow {
+                        AddElementButton(text = "Táblázat", icon = Icons.Filled.GridOn, onClick = onAddTable, modifier = Modifier.weight(1f))
+                        AddElementButton(text = "Pipálható lista", icon = Icons.Filled.Check, onClick = onAddChecklist, modifier = Modifier.weight(1f))
+                    }
+                    AddElementButtonRow {
+                        AddElementButton(text = "Aláírás", icon = Icons.Filled.Draw, onClick = onAddSignature, modifier = Modifier.weight(1f))
+                        AddElementButton(text = "Bélyegző", icon = Icons.Filled.Check, onClick = onAddStamp, modifier = Modifier.weight(1f))
+                    }
+                    AddElementButtonRow {
+                        AddElementButton(text = "Oldaltörés", icon = Icons.Filled.InsertPageBreak, onClick = onAddPageBreak, modifier = Modifier.weight(1f))
+                    }
+                }
+                AddElementPage.HeaderFooter -> {
+                    Text("Fejléc és lábléc (minden oldalon)", style = MaterialTheme.typography.titleSmall)
+                    AddElementButtonRow {
+                        AddElementButton(text = "Fejléc", icon = Icons.Filled.GridOn, onClick = onAddHeader, modifier = Modifier.weight(1f))
+                        AddElementButton(text = "Lábléc", icon = Icons.Filled.GridOn, onClick = onAddFooter, modifier = Modifier.weight(1f))
+                    }
+                    AddElementButtonRow {
+                        AddElementButton(text = "Szöveg fejlécbe", icon = Icons.Filled.Draw, onClick = onAddHeaderText, modifier = Modifier.weight(1f))
+                        AddElementButton(text = "Szöveg láblécbe", icon = Icons.Filled.Draw, onClick = onAddFooterText, modifier = Modifier.weight(1f))
+                    }
+                    AddElementButtonRow {
+                        AddElementButton(text = "Táblázat fejlécbe", icon = Icons.Filled.GridOn, onClick = onAddHeaderTable, modifier = Modifier.weight(1f))
+                        AddElementButton(text = "Táblázat láblécbe", icon = Icons.Filled.GridOn, onClick = onAddFooterTable, modifier = Modifier.weight(1f))
+                    }
+                    AddElementButtonRow {
+                        AddElementButton(text = "Oldalszám fejlécbe", icon = Icons.Filled.InsertPageBreak, onClick = onAddHeaderPageNumber, modifier = Modifier.weight(1f))
+                        AddElementButton(text = "Oldalszám láblécbe", icon = Icons.Filled.InsertPageBreak, onClick = onAddFooterPageNumber, modifier = Modifier.weight(1f))
+                    }
+                }
+                AddElementPage.Photos -> {
+                    Text("Fotóoldalak (minden kép alatt)", style = MaterialTheme.typography.titleSmall)
+                    AddElementButtonRow {
+                        AddElementButton(text = "Szöveg fotóhoz", icon = Icons.Filled.Draw, onClick = onAddImageText, modifier = Modifier.weight(1f))
+                        AddElementButton(text = "Dátum fotóhoz", icon = Icons.Filled.DateRange, onClick = onAddImageDate, modifier = Modifier.weight(1f))
+                    }
+                    AddElementButtonRow {
+                        AddElementButton(text = "Táblázat fotóhoz", icon = Icons.Filled.GridOn, onClick = onAddImageTable, modifier = Modifier.weight(1f))
+                        AddElementButton(text = "Oldalszám fotóhoz", icon = Icons.Filled.InsertPageBreak, onClick = onAddImagePageNumber, modifier = Modifier.weight(1f))
+                    }
+                }
             }
         }
+    }
+}
+
+private enum class AddElementPage { Default, HeaderFooter, Photos }
+
+@Composable
+private fun AddElementPageButton(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (selected) {
+        Button(onClick = onClick, modifier = modifier.heightIn(min = 40.dp)) { Text(text) }
+    } else {
+        OutlinedButton(onClick = onClick, modifier = modifier.heightIn(min = 40.dp)) { Text(text) }
     }
 }
 
@@ -362,6 +436,24 @@ private fun BlockRow(
     block: TemplateBlock,
     readOnly: Boolean,
     onTextChange: (String) -> Unit,
+    onTextSettingsChange: (TableCellSettings) -> Unit,
+    onDateSettingsChange: (TableCellSettings) -> Unit,
+    onPageNumberSettingsChange: (TableCellSettings) -> Unit,
+    onNestedTextChange: (blockId: String, value: String) -> Unit,
+    onNestedTextSettingsChange: (blockId: String, settings: TableCellSettings) -> Unit,
+    onNestedDateSettingsChange: (blockId: String, settings: TableCellSettings) -> Unit,
+    onNestedPageNumberSettingsChange: (blockId: String, settings: TableCellSettings) -> Unit,
+    onNestedRemove: (blockId: String) -> Unit,
+    onNestedMoveUp: (blockId: String) -> Unit,
+    onNestedMoveDown: (blockId: String) -> Unit,
+    onNestedTableCellTextChange: (tableId: String, row: Int, column: Int, value: String) -> Unit,
+    onNestedTableRowSettingsChange: (tableId: String, row: Int, settings: TableAxisSettings) -> Unit,
+    onNestedTableColumnSettingsChange: (tableId: String, column: Int, settings: TableAxisSettings) -> Unit,
+    onNestedTableCellSettingsChange: (tableId: String, row: Int, column: Int, settings: TableCellSettings) -> Unit,
+    onNestedInsertRowBelow: (tableId: String, row: Int) -> Unit,
+    onNestedInsertColumnRight: (tableId: String, column: Int) -> Unit,
+    onNestedDeleteRow: (tableId: String, row: Int) -> Unit,
+    onNestedDeleteColumn: (tableId: String, column: Int) -> Unit,
     onTableCellTextChange: (row: Int, column: Int, value: String) -> Unit,
     onTableRowSettingsChange: (row: Int, settings: TableAxisSettings) -> Unit,
     onTableColumnSettingsChange: (column: Int, settings: TableAxisSettings) -> Unit,
@@ -374,6 +466,33 @@ private fun BlockRow(
     onMoveDown: () -> Unit,
     onRemove: () -> Unit,
 ) {
+    var styleDialog by remember(block.id) { mutableStateOf<TableCellSettings?>(null) }
+    var styleConfirm by remember(block.id) { mutableStateOf<(TableCellSettings) -> Unit>({}) }
+    var tableDialog by remember(block.id) { mutableStateOf(false) }
+
+    val label = when (block) {
+        is TemplateBlock.Text -> "Szöveg"
+        is TemplateBlock.Date -> "Dátum"
+        is TemplateBlock.Table -> "Táblázat: ${block.rows.coerceIn(1, 50)} sor × ${block.columns.coerceIn(1, 20)} oszlop"
+        is TemplateBlock.Signature -> "Aláírás a profilból"
+        is TemplateBlock.Stamp -> "Bélyegző a profilból"
+        is TemplateBlock.Images -> "Fotóoldal sablon (nem törölhető)"
+        is TemplateBlock.Image -> "Kép helye"
+        is TemplateBlock.PageBreak -> "Oldaltörés / új oldal"
+        is TemplateBlock.PageNumber -> "Oldalszám"
+        is TemplateBlock.Header -> "Fejléc (minden oldalon)"
+        is TemplateBlock.Footer -> "Lábléc (minden oldalon)"
+        is TemplateBlock.Html -> "HTML / táblázatos rész"
+    }
+    val icon = when (block) {
+        is TemplateBlock.Date -> Icons.Filled.DateRange
+        is TemplateBlock.Table, is TemplateBlock.Header, is TemplateBlock.Footer, is TemplateBlock.Html -> Icons.Filled.GridOn
+        is TemplateBlock.Signature, is TemplateBlock.Text -> Icons.Filled.Draw
+        is TemplateBlock.Stamp -> Icons.Filled.Check
+        is TemplateBlock.Images, is TemplateBlock.Image -> Icons.Filled.Image
+        is TemplateBlock.PageBreak, is TemplateBlock.PageNumber -> Icons.Filled.InsertPageBreak
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
@@ -382,82 +501,184 @@ private fun BlockRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            when (block) {
-                is TemplateBlock.Text -> {
-                    OutlinedTextField(
-                        value = block.text,
-                        onValueChange = onTextChange,
-                        label = { Text(stringResource(R.string.template_editor_text_block_label)) },
-                        enabled = !readOnly,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 96.dp),
-                    )
-                }
-                is TemplateBlock.Date -> {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.DateRange,
-                            contentDescription = null,
-                        )
-                        Text(
-                            text = stringResource(R.string.template_editor_date_block_label),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(imageVector = icon, contentDescription = null)
+                Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                if (!readOnly) {
+                    when (block) {
+                        is TemplateBlock.Text -> IconButton(onClick = { styleConfirm = onTextSettingsChange; styleDialog = block.settings }) { Icon(Icons.Filled.Settings, contentDescription = "Beállítások") }
+                        is TemplateBlock.Date -> IconButton(onClick = { styleConfirm = onDateSettingsChange; styleDialog = block.settings }) { Icon(Icons.Filled.Settings, contentDescription = "Beállítások") }
+                        is TemplateBlock.PageNumber -> IconButton(onClick = { styleConfirm = onPageNumberSettingsChange; styleDialog = block.settings }) { Icon(Icons.Filled.Settings, contentDescription = "Beállítások") }
+                        is TemplateBlock.Table -> IconButton(onClick = { tableDialog = true }) { Icon(Icons.Filled.Settings, contentDescription = "Beállítások") }
+                        else -> Unit
                     }
                 }
-                is TemplateBlock.Table -> TableBlockEditor(
-                    block = block,
-                    readOnly = readOnly,
-                    onCellTextChange = onTableCellTextChange,
-                    onRowSettingsChange = onTableRowSettingsChange,
-                    onColumnSettingsChange = onTableColumnSettingsChange,
-                    onCellSettingsChange = onTableCellSettingsChange,
-                    onInsertRowBelow = onInsertRowBelow,
-                    onInsertColumnRight = onInsertColumnRight,
-                    onDeleteRow = onDeleteRow,
-                    onDeleteColumn = onDeleteColumn,
-                )
-                is TemplateBlock.Signature -> BlockLabel(Icons.Filled.Draw, "Aláírás a profilból")
-                is TemplateBlock.Stamp -> BlockLabel(Icons.Filled.Check, "Bélyegző a profilból")
-                is TemplateBlock.Images -> BlockLabel(Icons.Filled.Image, "Fotók helye (nem törölhető)")
-                is TemplateBlock.PageBreak -> BlockLabel(Icons.Filled.InsertPageBreak, "Oldaltörés / új oldal")
-                is TemplateBlock.Html -> HtmlBlockLabel(block)
             }
+
+            when (block) {
+                is TemplateBlock.Text -> OutlinedTextField(
+                    value = block.text,
+                    onValueChange = onTextChange,
+                    label = { Text(stringResource(R.string.template_editor_text_block_label)) },
+                    enabled = !readOnly,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 96.dp),
+                )
+                is TemplateBlock.Header -> ContainerBlockLabel(
+                    title = "Fejléc tartalma",
+                    blocks = block.blocks,
+                    readOnly = readOnly,
+                    onTextChange = onNestedTextChange,
+                    onTextSettingsChange = onNestedTextSettingsChange,
+                    onDateSettingsChange = onNestedDateSettingsChange,
+                    onPageNumberSettingsChange = onNestedPageNumberSettingsChange,
+                    onDeleteBlock = onNestedRemove,
+                    onMoveBlockUp = onNestedMoveUp,
+                    onMoveBlockDown = onNestedMoveDown,
+                    onTableCellTextChange = onNestedTableCellTextChange,
+                    onTableRowSettingsChange = onNestedTableRowSettingsChange,
+                    onTableColumnSettingsChange = onNestedTableColumnSettingsChange,
+                    onTableCellSettingsChange = onNestedTableCellSettingsChange,
+                    onInsertRowBelow = onNestedInsertRowBelow,
+                    onInsertColumnRight = onNestedInsertColumnRight,
+                    onDeleteRow = onNestedDeleteRow,
+                    onDeleteColumn = onNestedDeleteColumn,
+                )
+                is TemplateBlock.Footer -> ContainerBlockLabel(
+                    title = "Lábléc tartalma",
+                    blocks = block.blocks,
+                    readOnly = readOnly,
+                    onTextChange = onNestedTextChange,
+                    onTextSettingsChange = onNestedTextSettingsChange,
+                    onDateSettingsChange = onNestedDateSettingsChange,
+                    onPageNumberSettingsChange = onNestedPageNumberSettingsChange,
+                    onDeleteBlock = onNestedRemove,
+                    onMoveBlockUp = onNestedMoveUp,
+                    onMoveBlockDown = onNestedMoveDown,
+                    onTableCellTextChange = onNestedTableCellTextChange,
+                    onTableRowSettingsChange = onNestedTableRowSettingsChange,
+                    onTableColumnSettingsChange = onNestedTableColumnSettingsChange,
+                    onTableCellSettingsChange = onNestedTableCellSettingsChange,
+                    onInsertRowBelow = onNestedInsertRowBelow,
+                    onInsertColumnRight = onNestedInsertColumnRight,
+                    onDeleteRow = onNestedDeleteRow,
+                    onDeleteColumn = onNestedDeleteColumn,
+                )
+                is TemplateBlock.Images -> ContainerBlockLabel(
+                    title = "Fotóoldal tartalma",
+                    blocks = block.blocks,
+                    readOnly = readOnly,
+                    onTextChange = onNestedTextChange,
+                    onTextSettingsChange = onNestedTextSettingsChange,
+                    onDateSettingsChange = onNestedDateSettingsChange,
+                    onPageNumberSettingsChange = onNestedPageNumberSettingsChange,
+                    onDeleteBlock = onNestedRemove,
+                    onMoveBlockUp = onNestedMoveUp,
+                    onMoveBlockDown = onNestedMoveDown,
+                    onTableCellTextChange = onNestedTableCellTextChange,
+                    onTableRowSettingsChange = onNestedTableRowSettingsChange,
+                    onTableColumnSettingsChange = onNestedTableColumnSettingsChange,
+                    onTableCellSettingsChange = onNestedTableCellSettingsChange,
+                    onInsertRowBelow = onNestedInsertRowBelow,
+                    onInsertColumnRight = onNestedInsertColumnRight,
+                    onDeleteRow = onNestedDeleteRow,
+                    onDeleteColumn = onNestedDeleteColumn,
+                )
+                is TemplateBlock.Html -> HtmlBlockLabel(block)
+                else -> Unit
+            }
+
             if (!readOnly) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                ) {
-                    IconButton(onClick = onMoveUp) {
-                        Icon(
-                            imageVector = Icons.Filled.ArrowUpward,
-                            contentDescription = stringResource(R.string.template_editor_block_move_up),
-                        )
-                    }
-                    IconButton(onClick = onMoveDown) {
-                        Icon(
-                            imageVector = Icons.Filled.ArrowDownward,
-                            contentDescription = stringResource(R.string.template_editor_block_move_down),
-                        )
-                    }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    IconButton(onClick = onMoveUp) { Icon(Icons.Filled.ArrowUpward, contentDescription = stringResource(R.string.template_editor_block_move_up)) }
+                    IconButton(onClick = onMoveDown) { Icon(Icons.Filled.ArrowDownward, contentDescription = stringResource(R.string.template_editor_block_move_down)) }
                     if (block !is TemplateBlock.Images) {
-                        IconButton(onClick = onRemove) {
-                            Icon(
-                                imageVector = Icons.Filled.Delete,
-                                contentDescription = stringResource(R.string.template_editor_block_delete),
-                            )
-                        }
+                        IconButton(onClick = onRemove) { Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.template_editor_block_delete)) }
                     }
                 }
             }
         }
     }
+
+    styleDialog?.let { settings ->
+        StyledBlockSettingsDialog(
+            settings = settings,
+            onDismiss = { styleDialog = null },
+            onDelete = {
+                styleDialog = null
+                onRemove()
+            },
+            onConfirm = {
+                styleDialog = null
+                styleConfirm(it)
+            },
+        )
+    }
+    if (tableDialog && block is TemplateBlock.Table) {
+        TableSettingsDialog(
+            block = block,
+            readOnly = readOnly,
+            onDismiss = { tableDialog = false },
+            onDelete = {
+                tableDialog = false
+                onRemove()
+            },
+            onCellTextChange = onTableCellTextChange,
+            onRowSettingsChange = onTableRowSettingsChange,
+            onColumnSettingsChange = onTableColumnSettingsChange,
+            onCellSettingsChange = onTableCellSettingsChange,
+            onInsertRowBelow = onInsertRowBelow,
+            onInsertColumnRight = onInsertColumnRight,
+            onDeleteRow = onDeleteRow,
+            onDeleteColumn = onDeleteColumn,
+        )
+    }
+}
+
+@Composable
+private fun TableSettingsDialog(
+    block: TemplateBlock.Table,
+    readOnly: Boolean,
+    onDismiss: () -> Unit,
+    onDelete: () -> Unit,
+    onCellTextChange: (row: Int, column: Int, value: String) -> Unit,
+    onRowSettingsChange: (row: Int, settings: TableAxisSettings) -> Unit,
+    onColumnSettingsChange: (column: Int, settings: TableAxisSettings) -> Unit,
+    onCellSettingsChange: (row: Int, column: Int, settings: TableCellSettings) -> Unit,
+    onInsertRowBelow: (row: Int) -> Unit,
+    onInsertColumnRight: (column: Int) -> Unit,
+    onDeleteRow: (row: Int) -> Unit,
+    onDeleteColumn: (column: Int) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Táblázat beállításai") },
+        text = {
+            TableBlockEditor(
+                block = block,
+                readOnly = readOnly,
+                onCellTextChange = onCellTextChange,
+                onRowSettingsChange = onRowSettingsChange,
+                onColumnSettingsChange = onColumnSettingsChange,
+                onCellSettingsChange = onCellSettingsChange,
+                onInsertRowBelow = onInsertRowBelow,
+                onInsertColumnRight = onInsertColumnRight,
+                onDeleteRow = onDeleteRow,
+                onDeleteColumn = onDeleteColumn,
+            )
+        },
+        confirmButton = { Button(onClick = onDismiss) { Text(stringResource(R.string.action_save)) } },
+        dismissButton = {
+            OutlinedButton(onClick = onDelete, enabled = !readOnly) {
+                Text(stringResource(R.string.template_editor_block_delete))
+            }
+        },
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -711,12 +932,21 @@ private fun CellSettingsDialog(
                         OutlinedButton(onClick = { draftText = "✓" }, modifier = Modifier.weight(1f)) { Text("✓") }
                     }
                 } else {
-                    OutlinedTextField(
-                        value = draftText,
-                        onValueChange = { draftText = it },
-                        label = { Text("Cella szövege") },
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                    )
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        OutlinedTextField(
+                            value = draftText,
+                            onValueChange = { draftText = it },
+                            label = { Text("Cella szövege") },
+                            modifier = Modifier.weight(1f),
+                        )
+                        OutlinedButton(onClick = { draftText += PAGE_NUMBER_TOKEN }) {
+                            Text("Oldalszám")
+                        }
+                    }
                 }
                 ColorSettingButtons(
                     backgroundColor = draft.backgroundColor,
@@ -906,6 +1136,8 @@ private fun ColorSlider(label: String, value: Int, onChange: (Int) -> Unit) {
     }
 }
 
+private const val PAGE_NUMBER_TOKEN = "{{oldalszam}}"
+
 private val PRESET_COLORS = listOf(
     "Piros" to "#FF0000",
     "Kék" to "#0000FF",
@@ -929,6 +1161,158 @@ private fun HtmlBlockLabel(block: TemplateBlock.Html) {
         else -> "Szerkeszthető mező"
     }
     BlockLabel(Icons.Filled.GridOn, "$label (az előnézetben szerkeszthető)")
+}
+
+@Composable
+private fun ContainerBlockLabel(
+    title: String,
+    blocks: List<TemplateBlock>,
+    readOnly: Boolean,
+    onTextChange: (blockId: String, value: String) -> Unit,
+    onTextSettingsChange: (blockId: String, settings: TableCellSettings) -> Unit,
+    onDateSettingsChange: (blockId: String, settings: TableCellSettings) -> Unit,
+    onPageNumberSettingsChange: (blockId: String, settings: TableCellSettings) -> Unit,
+    onDeleteBlock: (blockId: String) -> Unit,
+    onMoveBlockUp: (blockId: String) -> Unit,
+    onMoveBlockDown: (blockId: String) -> Unit,
+    onTableCellTextChange: (tableId: String, row: Int, column: Int, value: String) -> Unit,
+    onTableRowSettingsChange: (tableId: String, row: Int, settings: TableAxisSettings) -> Unit,
+    onTableColumnSettingsChange: (tableId: String, column: Int, settings: TableAxisSettings) -> Unit,
+    onTableCellSettingsChange: (tableId: String, row: Int, column: Int, settings: TableCellSettings) -> Unit,
+    onInsertRowBelow: (tableId: String, row: Int) -> Unit,
+    onInsertColumnRight: (tableId: String, column: Int) -> Unit,
+    onDeleteRow: (tableId: String, row: Int) -> Unit,
+    onDeleteColumn: (tableId: String, column: Int) -> Unit,
+) {
+    var styleDialog by remember(title) { mutableStateOf<Pair<String, TableCellSettings>?>(null) }
+    var styleConfirm by remember(title) { mutableStateOf<(String, TableCellSettings) -> Unit>({ _, _ -> }) }
+    var tableDialog by remember(title) { mutableStateOf<TemplateBlock.Table?>(null) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(title, style = MaterialTheme.typography.bodySmall)
+        if (blocks.isEmpty()) {
+            Text("Üres", style = MaterialTheme.typography.bodySmall)
+        } else {
+            blocks.forEach { block ->
+                val label = when (block) {
+                    is TemplateBlock.Text -> "Szöveg"
+                    is TemplateBlock.Date -> "Dátum"
+                    is TemplateBlock.Table -> "Táblázat: ${block.rows.coerceIn(1, 50)} sor × ${block.columns.coerceIn(1, 20)} oszlop"
+                    is TemplateBlock.Signature -> "Aláírás"
+                    is TemplateBlock.Stamp -> "Bélyegző"
+                    is TemplateBlock.Images -> "Fotók"
+                    is TemplateBlock.Image -> "Kép"
+                    is TemplateBlock.PageBreak -> "Oldaltörés"
+                    is TemplateBlock.PageNumber -> "Oldalszám"
+                    is TemplateBlock.Header -> "Fejléc"
+                    is TemplateBlock.Footer -> "Lábléc"
+                    is TemplateBlock.Html -> "HTML / táblázatos rész"
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (block is TemplateBlock.Text) {
+                        OutlinedTextField(
+                            value = block.text,
+                            onValueChange = { onTextChange(block.id, it) },
+                            label = { Text(label) },
+                            enabled = !readOnly,
+                            modifier = Modifier.weight(1f),
+                        )
+                    } else {
+                        Text("• $label", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                    }
+                    if (!readOnly) {
+                        when (block) {
+                            is TemplateBlock.Text -> IconButton(onClick = { styleConfirm = onTextSettingsChange; styleDialog = block.id to block.settings }) { Icon(Icons.Filled.Settings, contentDescription = "Beállítások") }
+                            is TemplateBlock.Date -> IconButton(onClick = { styleConfirm = onDateSettingsChange; styleDialog = block.id to block.settings }) { Icon(Icons.Filled.Settings, contentDescription = "Beállítások") }
+                            is TemplateBlock.PageNumber -> IconButton(onClick = { styleConfirm = onPageNumberSettingsChange; styleDialog = block.id to block.settings }) { Icon(Icons.Filled.Settings, contentDescription = "Beállítások") }
+                            is TemplateBlock.Table -> IconButton(onClick = { tableDialog = block }) { Icon(Icons.Filled.Settings, contentDescription = "Beállítások") }
+                            else -> Unit
+                        }
+                        IconButton(onClick = { onMoveBlockUp(block.id) }) {
+                            Icon(Icons.Filled.ArrowUpward, contentDescription = stringResource(R.string.template_editor_block_move_up))
+                        }
+                        IconButton(onClick = { onMoveBlockDown(block.id) }) {
+                            Icon(Icons.Filled.ArrowDownward, contentDescription = stringResource(R.string.template_editor_block_move_down))
+                        }
+                    }
+                }
+            }
+        }
+    }
+    styleDialog?.let { (blockId, settings) ->
+        StyledBlockSettingsDialog(
+            settings = settings,
+            onDismiss = { styleDialog = null },
+            onDelete = {
+                styleDialog = null
+                onDeleteBlock(blockId)
+            },
+            onConfirm = {
+                styleDialog = null
+                styleConfirm(blockId, it)
+            },
+        )
+    }
+    tableDialog?.let { table ->
+        TableSettingsDialog(
+            block = table,
+            readOnly = readOnly,
+            onDismiss = { tableDialog = null },
+            onDelete = {
+                tableDialog = null
+                onDeleteBlock(table.id)
+            },
+            onCellTextChange = { row, column, value -> onTableCellTextChange(table.id, row, column, value) },
+            onRowSettingsChange = { row, settings -> onTableRowSettingsChange(table.id, row, settings) },
+            onColumnSettingsChange = { column, settings -> onTableColumnSettingsChange(table.id, column, settings) },
+            onCellSettingsChange = { row, column, settings -> onTableCellSettingsChange(table.id, row, column, settings) },
+            onInsertRowBelow = { row -> onInsertRowBelow(table.id, row) },
+            onInsertColumnRight = { column -> onInsertColumnRight(table.id, column) },
+            onDeleteRow = { row -> onDeleteRow(table.id, row) },
+            onDeleteColumn = { column -> onDeleteColumn(table.id, column) },
+        )
+    }
+}
+
+@Composable
+private fun StyledSettingsButton(readOnly: Boolean, onClick: () -> Unit) {
+    OutlinedButton(onClick = onClick, enabled = !readOnly) { Text("Szín és igazítás") }
+}
+
+@Composable
+private fun StyledBlockSettingsDialog(
+    settings: TableCellSettings,
+    onDismiss: () -> Unit,
+    onDelete: () -> Unit,
+    onConfirm: (TableCellSettings) -> Unit,
+) {
+    var draft by remember(settings) { mutableStateOf(settings) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Szín és igazítás") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                ColorSettingButtons(
+                    backgroundColor = draft.backgroundColor,
+                    textColor = draft.textColor,
+                    onBackgroundChange = { draft = draft.copy(backgroundColor = it) },
+                    onTextColorChange = { draft = draft.copy(textColor = it) },
+                )
+                TextAlignPicker(value = draft.textAlign, onChange = { draft = draft.copy(textAlign = it) })
+            }
+        },
+        confirmButton = { Button(onClick = { onConfirm(draft) }) { Text(stringResource(R.string.action_save)) } },
+        dismissButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onDelete) { Text(stringResource(R.string.template_editor_block_delete)) }
+                OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+            }
+        },
+    )
 }
 
 @Composable

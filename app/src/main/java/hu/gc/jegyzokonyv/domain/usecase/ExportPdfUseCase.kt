@@ -82,13 +82,27 @@ class ExportPdfUseCase @Inject constructor(
             ?: doc.title().trim()
         val meta = doc.selectFirst(".meta")?.wholeText()?.trim()?.ifBlank { null }
         val content = doc.getElementById(CONTENT_ID) ?: doc.body()
+        val headerBlocks = buildList {
+            content.children().filter { it.hasClass("repeat-header") }.forEach { header ->
+                header.children().forEach { addExportBlocksFromElement(it, draftDir) }
+            }
+        }
+        val footerBlocks = buildList {
+            content.children().filter { it.hasClass("repeat-footer") }.forEach { footer ->
+                footer.children().forEach { addExportBlocksFromElement(it, draftDir) }
+            }
+        }
         val blocks = buildList {
-            content.children().forEach { element -> addExportBlocksFromElement(element, draftDir) }
+            content.children()
+                .filterNot { it.hasClass("repeat-header") || it.hasClass("repeat-footer") }
+                .forEach { element -> addExportBlocksFromElement(element, draftDir) }
         }
 
         return ExportDocument(
             title = title.ifBlank { DEFAULT_TITLE },
             meta = meta,
+            headerBlocks = headerBlocks,
+            footerBlocks = footerBlocks,
             blocks = blocks,
         )
     }
@@ -96,9 +110,9 @@ class ExportPdfUseCase @Inject constructor(
     private fun MutableList<ExportBlock>.addExportBlocksFromElement(element: Element, draftDir: File) {
         when {
             element.hasClass("photo-block") -> addPhotoExportBlock(element, draftDir)
-            element.hasClass("images-block") -> element.children().forEach { addExportBlocksFromElement(it, draftDir) }
-            element.hasClass("date-block") -> blockText(element)?.let { add(ExportBlock.Text(text = it, style = TextBlockStyle.Date)) }
-            element.hasClass("text-block") -> blockText(element)?.let { add(ExportBlock.Text(text = it, style = TextBlockStyle.Body)) }
+            element.hasClass("images-block") -> element.children().filterNot { it.hasClass("image-page-template") }.forEach { addExportBlocksFromElement(it, draftDir) }
+            element.hasClass("date-block") -> blockText(element)?.let { add(element.toExportTextBlock(it, TextBlockStyle.Date)) }
+            element.hasClass("text-block") -> blockText(element)?.let { add(element.toExportTextBlock(it, TextBlockStyle.Body)) }
             element.hasClass("editable-table") || element.normalName() == "table" -> {
                 val rows = exportTableRows(element)
                 if (rows.isNotEmpty()) add(ExportBlock.Table(rows = rows))
@@ -112,9 +126,36 @@ class ExportPdfUseCase @Inject constructor(
                 add(ExportBlock.ProfileImage(resolveAnyImage(draftDir, image)?.takeIf { it.isFile }, "", false))
             }
             element.hasClass("template-page-break") -> add(ExportBlock.PageBreak)
+            element.hasClass("page-number") -> add(element.toExportPageNumber())
             element.children().isNotEmpty() -> element.children().forEach { addExportBlocksFromElement(it, draftDir) }
-            element.wholeText().trim().isNotBlank() -> add(ExportBlock.Text(element.wholeText().trim(), TextBlockStyle.Body))
+            element.wholeText().trim().isNotBlank() -> add(element.toExportTextBlock(element.wholeText().trim(), TextBlockStyle.Body))
         }
+    }
+
+    private fun Element.toExportTextBlock(text: String, styleKind: TextBlockStyle): ExportBlock.Text {
+        val style = parseStyle(attr("style"))
+        return ExportBlock.Text(
+            text = text,
+            style = styleKind,
+            backgroundColor = parseCssColor(style["background"] ?: style["background-color"]),
+            textColor = parseCssColor(style["color"]),
+            textAlign = style.toTextAlign(),
+        )
+    }
+
+    private fun Element.toExportPageNumber(): ExportBlock.PageNumber {
+        val style = parseStyle(attr("style"))
+        return ExportBlock.PageNumber(
+            backgroundColor = parseCssColor(style["background"] ?: style["background-color"]),
+            textColor = parseCssColor(style["color"]),
+            textAlign = style.toTextAlign(),
+        )
+    }
+
+    private fun Map<String, String>.toTextAlign(): TextAlign = when (this["text-align"]?.lowercase(Locale.ROOT)) {
+        "center" -> TextAlign.Center
+        "right", "end" -> TextAlign.Right
+        else -> TextAlign.Left
     }
 
     private fun exportTableRows(table: Element): List<List<ExportTableCell>> {
@@ -771,6 +812,11 @@ class ExportPdfUseCase @Inject constructor(
         private var page: PdfDocument.Page? = null
         private var pageNumber = 0
         private var y = PAGE_MARGIN_PT
+        private val topContentY: Float get() = PAGE_MARGIN_PT + if (document.headerBlocks.isEmpty()) 0f else REPEAT_HEADER_HEIGHT_PT
+        private val bottomContentY: Float get() = PAGE_BOTTOM_PT - if (document.footerBlocks.isEmpty()) 0f else REPEAT_FOOTER_HEIGHT_PT
+        private var allowPagination = true
+        private var repeatBottomY = PAGE_BOTTOM_PT
+        private val currentBottomY: Float get() = if (allowPagination) bottomContentY else repeatBottomY
         private var imageCount = 0
 
         private val titlePaint = textPaint(
@@ -823,6 +869,7 @@ class ExportPdfUseCase @Inject constructor(
                     is ExportBlock.Table -> drawTableBlock(block)
                     is ExportBlock.ProfileImage -> drawProfileImageBlock(block)
                     is ExportBlock.PageBreak -> startPage()
+                    is ExportBlock.PageNumber -> drawPageNumber(block, spacingAfter = 10f)
                 }
             }
             finishCurrentPage()
@@ -839,11 +886,17 @@ class ExportPdfUseCase @Inject constructor(
         }
 
         private fun drawTextBlock(block: ExportBlock.Text) {
-            val paint = when (block.style) {
+            val basePaint = when (block.style) {
                 TextBlockStyle.Body -> bodyPaint
                 TextBlockStyle.Date -> datePaint
             }
-            drawWrappedText(block.text, paint, spacingAfter = 10f)
+            val paint = TextPaint(basePaint).apply { block.textColor?.let { color = it } }
+            drawWrappedText(block.text, paint, spacingAfter = 10f, backgroundColor = block.backgroundColor, textAlign = block.textAlign)
+        }
+
+        private fun drawPageNumber(block: ExportBlock.PageNumber, spacingAfter: Float) {
+            val paint = TextPaint(bodyPaint).apply { block.textColor?.let { color = it } }
+            drawWrappedText(pageNumber.toString(), paint, spacingAfter = spacingAfter, backgroundColor = block.backgroundColor, textAlign = block.textAlign)
         }
 
         private fun drawTableBlock(block: ExportBlock.Table) {
@@ -854,7 +907,9 @@ class ExportPdfUseCase @Inject constructor(
             val rowHeight = 28f
             val rowSpanContinuations = IntArray(columns)
             rows.forEach { row ->
-                if (y + rowHeight > PAGE_BOTTOM_PT) startPage()
+                if (y + rowHeight > currentBottomY) {
+                    if (allowPagination) startPage() else return@forEach
+                }
                 var column = 0
                 row.forEach { cell ->
                     while (column < columns && rowSpanContinuations[column] > 0) column++
@@ -896,7 +951,7 @@ class ExportPdfUseCase @Inject constructor(
                 TextAlign.Left -> Layout.Alignment.ALIGN_NORMAL
             }
             val layout = staticLayout(
-                text = cell.text,
+                text = cell.text.replace(PAGE_NUMBER_TOKEN, pageNumber.toString()),
                 paint = paint,
                 width = (rect.width() - 8f).roundToInt().coerceAtLeast(1),
                 alignment = alignment,
@@ -916,7 +971,9 @@ class ExportPdfUseCase @Inject constructor(
             val bounds = decodeImageBounds(image) ?: return
             val width = if (block.signature) 170f else 140f
             val height = if (block.signature) 70f else 95f
-            if (y + height + 24f > PAGE_BOTTOM_PT) startPage()
+            if (y + height + 24f > currentBottomY) {
+                if (allowPagination) startPage() else return
+            }
             val left = PAGE_WIDTH_PT - PAGE_MARGIN_PT - width
             if (drawBitmap(image, bounds, readOrientation(image), RectF(left, y, left + width, y + height))) imageCount += 1
             y += height
@@ -954,7 +1011,7 @@ class ExportPdfUseCase @Inject constructor(
 
             var drawWidth = CONTENT_WIDTH_PT
             var drawHeight = drawWidth * displaySize.height.toFloat() / displaySize.width.toFloat()
-            val maxImageHeight = USABLE_HEIGHT_PT - captionGap - captionHeight
+            val maxImageHeight = (currentBottomY - topContentY) - captionGap - captionHeight
             if (drawHeight > maxImageHeight) {
                 val scale = maxImageHeight / drawHeight
                 drawWidth *= scale
@@ -962,8 +1019,8 @@ class ExportPdfUseCase @Inject constructor(
             }
 
             val blockHeight = drawHeight + captionGap + captionHeight + 12f
-            if (y + blockHeight > PAGE_BOTTOM_PT && y > PAGE_MARGIN_PT) {
-                startPage()
+            if (y + blockHeight > currentBottomY && y > topContentY) {
+                if (allowPagination) startPage() else return
             }
 
             val left = PAGE_MARGIN_PT + ((CONTENT_WIDTH_PT - drawWidth) / 2f)
@@ -988,8 +1045,8 @@ class ExportPdfUseCase @Inject constructor(
 
         private fun drawMissingImage(source: String) {
             val placeholderHeight = 96f
-            if (y + placeholderHeight > PAGE_BOTTOM_PT && y > PAGE_MARGIN_PT) {
-                startPage()
+            if (y + placeholderHeight > currentBottomY && y > topContentY) {
+                if (allowPagination) startPage() else return
             }
             val rect = RectF(PAGE_MARGIN_PT, y, PAGE_WIDTH_PT - PAGE_MARGIN_PT, y + placeholderHeight)
             canvas.drawRect(rect, placeholderPaint)
@@ -1063,17 +1120,28 @@ class ExportPdfUseCase @Inject constructor(
             return Bitmap.createScaledBitmap(bitmap, width, height, true)
         }
 
-        private fun drawWrappedText(text: String, paint: TextPaint, spacingAfter: Float) {
-            val layout = staticLayout(text, paint, CONTENT_WIDTH_PT.roundToInt())
+        private fun drawWrappedText(
+            text: String,
+            paint: TextPaint,
+            spacingAfter: Float,
+            backgroundColor: Int? = null,
+            textAlign: TextAlign = TextAlign.Left,
+        ) {
+            val alignment = when (textAlign) {
+                TextAlign.Center -> Layout.Alignment.ALIGN_CENTER
+                TextAlign.Right -> Layout.Alignment.ALIGN_OPPOSITE
+                TextAlign.Left -> Layout.Alignment.ALIGN_NORMAL
+            }
+            val layout = staticLayout(text, paint, CONTENT_WIDTH_PT.roundToInt(), alignment = alignment)
             var line = 0
             while (line < layout.lineCount) {
-                if (y >= PAGE_BOTTOM_PT) {
-                    startPage()
+                if (y >= currentBottomY) {
+                    if (allowPagination) startPage() else break
                 }
 
                 val chunkTop = layout.getLineTop(line)
                 var endLine = line
-                val available = PAGE_BOTTOM_PT - y
+                val available = currentBottomY - y
                 while (endLine < layout.lineCount &&
                     layout.getLineBottom(endLine) - chunkTop <= available
                 ) {
@@ -1081,11 +1149,19 @@ class ExportPdfUseCase @Inject constructor(
                 }
 
                 if (endLine == line) {
-                    startPage()
-                    continue
+                    if (allowPagination) {
+                        startPage()
+                        continue
+                    } else {
+                        break
+                    }
                 }
 
                 val chunkBottom = layout.getLineBottom(endLine - 1)
+                backgroundColor?.let { color ->
+                    tableFillPaint.color = color
+                    canvas.drawRect(PAGE_MARGIN_PT, y, PAGE_MARGIN_PT + CONTENT_WIDTH_PT, y + (chunkBottom - chunkTop).toFloat(), tableFillPaint)
+                }
                 canvas.save()
                 canvas.translate(PAGE_MARGIN_PT, y - chunkTop)
                 canvas.clipRect(
@@ -1101,7 +1177,7 @@ class ExportPdfUseCase @Inject constructor(
                 line = endLine
 
                 if (line < layout.lineCount) {
-                    startPage()
+                    if (allowPagination) startPage() else break
                 }
             }
             y += spacingAfter
@@ -1122,7 +1198,36 @@ class ExportPdfUseCase @Inject constructor(
                     .Builder(PAGE_WIDTH_PT.roundToInt(), PAGE_HEIGHT_PT.roundToInt(), pageNumber)
                     .create()
             )
-            y = PAGE_MARGIN_PT
+            drawRepeatingBlocks(document.headerBlocks, PAGE_MARGIN_PT, topContentY, pageNumber)
+            drawRepeatingBlocks(document.footerBlocks, PAGE_BOTTOM_PT - REPEAT_FOOTER_HEIGHT_PT + 8f, PAGE_BOTTOM_PT, pageNumber)
+            y = topContentY
+        }
+
+        private fun drawRepeatingBlocks(blocks: List<ExportBlock>, top: Float, bottom: Float, currentPageNumber: Int) {
+            if (blocks.isEmpty()) return
+            val originalY = y
+            val originalAllowPagination = allowPagination
+            val originalRepeatBottomY = repeatBottomY
+            y = top
+            allowPagination = false
+            repeatBottomY = bottom
+            canvas.save()
+            canvas.clipRect(PAGE_MARGIN_PT, top, PAGE_MARGIN_PT + CONTENT_WIDTH_PT, bottom)
+            blocks.forEach { block ->
+                when (block) {
+                    is ExportBlock.Text -> drawTextBlock(block)
+                    is ExportBlock.Table -> drawTableBlock(block)
+                    is ExportBlock.PageNumber -> {
+                        val paint = TextPaint(bodyPaint).apply { block.textColor?.let { color = it } }
+                        drawWrappedText(currentPageNumber.toString(), paint, spacingAfter = 4f, backgroundColor = block.backgroundColor, textAlign = block.textAlign)
+                    }
+                    is ExportBlock.ProfileImage, is ExportBlock.Photo, is ExportBlock.PageBreak -> Unit
+                }
+            }
+            canvas.restore()
+            allowPagination = originalAllowPagination
+            repeatBottomY = originalRepeatBottomY
+            y = originalY
         }
 
         private fun finishCurrentPage() {
@@ -1139,6 +1244,8 @@ class ExportPdfUseCase @Inject constructor(
     private data class ExportDocument(
         val title: String,
         val meta: String?,
+        val headerBlocks: List<ExportBlock>,
+        val footerBlocks: List<ExportBlock>,
         val blocks: List<ExportBlock>,
     )
 
@@ -1188,6 +1295,9 @@ class ExportPdfUseCase @Inject constructor(
         data class Text(
             val text: String,
             val style: TextBlockStyle,
+            val backgroundColor: Int? = null,
+            val textColor: Int? = null,
+            val textAlign: TextAlign = TextAlign.Left,
         ) : ExportBlock()
 
         data class Photo(
@@ -1205,6 +1315,11 @@ class ExportPdfUseCase @Inject constructor(
         ) : ExportBlock()
 
         data object PageBreak : ExportBlock()
+        data class PageNumber(
+            val backgroundColor: Int? = null,
+            val textColor: Int? = null,
+            val textAlign: TextAlign = TextAlign.Left,
+        ) : ExportBlock()
     }
 
     private data class ExportTableCell(
@@ -1253,6 +1368,7 @@ class ExportPdfUseCase @Inject constructor(
         const val SAFETY_CLASS = "safety-walkthrough"
         const val DEFAULT_TITLE = "Jegyzőkönyv"
         const val LEGACY_EXPORT_IMAGES_DIR = ".pdf_images"
+        const val PAGE_NUMBER_TOKEN = "{{oldalszam}}"
 
         const val POINTS_PER_INCH = 72f
         const val IMAGE_DPI = 180f
@@ -1262,6 +1378,8 @@ class ExportPdfUseCase @Inject constructor(
         const val CONTENT_WIDTH_PT = PAGE_WIDTH_PT - (PAGE_MARGIN_PT * 2f)
         const val USABLE_HEIGHT_PT = PAGE_HEIGHT_PT - (PAGE_MARGIN_PT * 2f)
         const val PAGE_BOTTOM_PT = PAGE_HEIGHT_PT - PAGE_MARGIN_PT
+        const val REPEAT_HEADER_HEIGHT_PT = 56f
+        const val REPEAT_FOOTER_HEIGHT_PT = 44f
         const val SAFETY_MARGIN_PT = 42f
         const val SAFETY_WIDTH_PT = PAGE_WIDTH_PT - (SAFETY_MARGIN_PT * 2f)
         const val OBSERVATION_TABLE_HEIGHT_PT = 310f

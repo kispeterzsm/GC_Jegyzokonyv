@@ -19,8 +19,8 @@ enum class TemplateKind(val jsonValue: String) {
 sealed class TemplateBlock {
     abstract val id: String
 
-    data class Text(override val id: String, val text: String) : TemplateBlock()
-    data class Date(override val id: String) : TemplateBlock()
+    data class Text(override val id: String, val text: String, val settings: TableCellSettings = TableCellSettings()) : TemplateBlock()
+    data class Date(override val id: String, val settings: TableCellSettings = TableCellSettings()) : TemplateBlock()
     data class Table(
         override val id: String,
         val rows: Int,
@@ -33,8 +33,12 @@ sealed class TemplateBlock {
     ) : TemplateBlock()
     data class Signature(override val id: String) : TemplateBlock()
     data class Stamp(override val id: String) : TemplateBlock()
-    data class Images(override val id: String) : TemplateBlock()
+    data class Images(override val id: String, val blocks: List<TemplateBlock> = listOf(Image(id = "image-component"))) : TemplateBlock()
+    data class Image(override val id: String) : TemplateBlock()
     data class PageBreak(override val id: String) : TemplateBlock()
+    data class PageNumber(override val id: String, val settings: TableCellSettings = TableCellSettings()) : TemplateBlock()
+    data class Header(override val id: String, val blocks: List<TemplateBlock> = emptyList()) : TemplateBlock()
+    data class Footer(override val id: String, val blocks: List<TemplateBlock> = emptyList()) : TemplateBlock()
     data class Html(override val id: String, val html: String) : TemplateBlock()
 }
 

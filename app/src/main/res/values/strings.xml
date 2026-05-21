@@ -39,8 +39,6 @@
     <string name="template_editor_new_title">Új sablon</string>
     <string name="template_editor_edit_title">Sablon szerkesztése</string>
     <string name="template_editor_name_hint">Sablon neve</string>
-    <string name="template_editor_title_hint">Dokumentum címe</string>
-    <string name="template_editor_title_helper">Ez lesz a jegyzőkönyv címe és az exportált PDF fájl neve.</string>
     <string name="template_editor_text_block_label">Szöveg</string>
     <string name="template_editor_date_block_label">Dátum (a használatkor a mai dátum kerül be)</string>
     <string name="template_editor_add_text_block">+ Szöveg</string>

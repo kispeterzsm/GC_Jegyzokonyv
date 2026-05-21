@@ -46,14 +46,17 @@ class DraftRepositoryImpl @Inject constructor(
 
     override suspend fun createDraftFromTemplate(templateId: String): String =
         withContext(io) {
-            val content = templateRepository.loadContent(templateId)
+            val template = templateRepository.getTemplate(templateId)
                 ?: error("Template not found: $templateId")
+            val content = templateRepository.loadContent(templateId)
+                ?: error("Template content not found: $templateId")
             val id = UUID.randomUUID().toString()
             val now = System.currentTimeMillis()
             val todayIso = dateFormatter().format(Date(now))
-            val title = buildDraftTitle(content.title, todayIso)
+            val title = buildDraftTitle(template.name, todayIso)
+            val renderContent = if (template.isBuiltIn) content else content.copy(title = "")
             val profile = profileRepository.profile.value
-            val initial = htmlEngine.renderTemplate(content, title, todayIso, profile)
+            val initial = htmlEngine.renderTemplate(renderContent, title, todayIso, profile)
 
             fileStorage.draftDir(id)
             fileStorage.imagesDir(id)

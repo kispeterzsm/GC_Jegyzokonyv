@@ -27,23 +27,7 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
 
         val doc = parse(wrapperHtml(title, showHeading = content.title.isNotBlank()))
         val container = ensureContentContainer(doc)
-        content.blocks.forEach { block ->
-            when (block) {
-                is TemplateBlock.Text -> {
-                    val div = container.appendElement("div").addClass("text-block")
-                    div.appendElement("p").text(block.text)
-                }
-                is TemplateBlock.Date -> {
-                    container.appendElement("div").addClass("date-block").text(todayIso)
-                }
-                is TemplateBlock.Table -> appendEditableTable(container, block)
-                is TemplateBlock.Signature -> appendSignature(container, profile)
-                is TemplateBlock.Stamp -> appendStamp(container, profile)
-                is TemplateBlock.Images -> appendImagesAnchor(container)
-                is TemplateBlock.PageBreak -> appendPageBreak(container)
-                is TemplateBlock.Html -> appendHtmlBlock(container, block)
-            }
-        }
+        content.blocks.forEach { block -> appendTemplateBlock(container, block, todayIso, profile) }
         return render(doc)
     }
 
@@ -62,10 +46,25 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
         }
 
         val content = ensureImagesContainer(doc) ?: ensureContentContainer(doc)
-        val block = content.appendElement("div").addClass("photo-block")
-        block.appendElement("img").attr("src", relativeImagePath)
-        if (!caption.isNullOrBlank()) {
-            block.appendElement("p").text(caption)
+        val template = content.selectFirst(".image-page-template[data-image-page-template=true]")
+        if (template != null) {
+            val page = template.clone()
+                .removeClass("image-page-template")
+                .addClass("image-page")
+                .removeAttr("data-image-page-template")
+                .removeAttr("style")
+            page.select("[data-image-component=true]").forEach { imageBlock ->
+                imageBlock.selectFirst("img")?.attr("src", relativeImagePath)
+                val captionElement = imageBlock.selectFirst(".image-caption") ?: imageBlock.selectFirst("p")
+                if (!caption.isNullOrBlank()) captionElement?.text(caption) else captionElement?.remove()
+            }
+            content.appendChild(page)
+        } else {
+            val block = content.appendElement("div").addClass("photo-block")
+            block.appendElement("img").attr("src", relativeImagePath)
+            if (!caption.isNullOrBlank()) {
+                block.appendElement("p").text(caption)
+            }
         }
         return render(doc)
     }
@@ -76,6 +75,49 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
         val block = content.appendElement("div").addClass("text-block")
         block.appendElement("p").text(text)
         return render(doc)
+    }
+
+    private fun appendTemplateBlock(parent: org.jsoup.nodes.Element, block: TemplateBlock, todayIso: String, profile: UserProfile?) {
+        when (block) {
+            is TemplateBlock.Text -> {
+                val div = parent.appendElement("div").addClass("text-block")
+                applyBlockStyle(div, block.settings)
+                div.appendElement("p").text(block.text)
+            }
+            is TemplateBlock.Date -> {
+                val div = parent.appendElement("div").addClass("date-block").text(todayIso)
+                applyBlockStyle(div, block.settings)
+            }
+            is TemplateBlock.Table -> appendEditableTable(parent, block)
+            is TemplateBlock.Signature -> appendSignature(parent, profile)
+            is TemplateBlock.Stamp -> appendStamp(parent, profile)
+            is TemplateBlock.Images -> appendImagesAnchor(parent, block, todayIso, profile)
+            is TemplateBlock.Image -> appendImageComponent(parent)
+            is TemplateBlock.PageBreak -> appendPageBreak(parent)
+            is TemplateBlock.PageNumber -> {
+                val span = parent.appendElement("span").addClass("page-number").text("1")
+                applyBlockStyle(span, block.settings, forceBlock = true)
+            }
+            is TemplateBlock.Header -> {
+                val div = parent.appendElement("div").addClass("repeat-header")
+                block.blocks.forEach { appendTemplateBlock(div, it, todayIso, profile) }
+            }
+            is TemplateBlock.Footer -> {
+                val div = parent.appendElement("div").addClass("repeat-footer")
+                block.blocks.forEach { appendTemplateBlock(div, it, todayIso, profile) }
+            }
+            is TemplateBlock.Html -> appendHtmlBlock(parent, block)
+        }
+    }
+
+    private fun applyBlockStyle(element: org.jsoup.nodes.Element, settings: TableCellSettings, forceBlock: Boolean = false) {
+        val styles = buildList {
+            if (forceBlock) add("display:block")
+            if (settings.backgroundColor.isNotBlank()) add("background:${settings.backgroundColor}")
+            if (settings.textColor.isNotBlank()) add("color:${settings.textColor}")
+            if (settings.textAlign.isNotBlank()) add("text-align:${settings.textAlign}")
+        }
+        if (styles.isNotEmpty()) element.attr("style", styles.joinToString(";"))
     }
 
     private fun appendEditableTable(parent: org.jsoup.nodes.Element, block: TemplateBlock.Table) {
@@ -149,7 +191,7 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
                 if (style.isNotBlank()) cell.attr("style", style)
                 if (cellSettings.hideIfEmpty) cell.attr("data-hide-if-empty", "true")
                 if (columnSettings.hideIfEmpty) cell.attr("data-hide-column-if-empty", "true")
-                cell.text(block.cells.getOrNull(rowIndex)?.getOrNull(colIndex).orEmpty())
+                cell.text(block.cells.getOrNull(rowIndex)?.getOrNull(colIndex).orEmpty().replace(PAGE_NUMBER_TOKEN, "1"))
             }
         }
     }
@@ -173,13 +215,25 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
         }
     }
 
-    private fun appendImagesAnchor(parent: org.jsoup.nodes.Element) {
-        parent.appendElement("div")
+    private fun appendImagesAnchor(parent: org.jsoup.nodes.Element, block: TemplateBlock.Images, todayIso: String, profile: UserProfile?) {
+        val anchor = parent.appendElement("div")
             .addClass("images-block")
             .attr("data-images-anchor", "true")
-            .appendElement("p")
+        anchor.appendElement("p")
             .addClass("images-placeholder")
             .text("Ide kerülnek a fotók")
+        val template = anchor.appendElement("div")
+            .addClass("image-page-template")
+            .attr("data-image-page-template", "true")
+            .attr("style", "display:none")
+        block.blocks.ifEmpty { listOf(TemplateBlock.Image(id = "image-component")) }
+            .forEach { appendTemplateBlock(template, it, todayIso, profile) }
+    }
+
+    private fun appendImageComponent(parent: org.jsoup.nodes.Element) {
+        val block = parent.appendElement("div").addClass("photo-block").attr("data-image-component", "true")
+        block.appendElement("img").attr("src", "")
+        block.appendElement("p").addClass("image-caption")
     }
 
     private fun appendPageBreak(parent: org.jsoup.nodes.Element) {
@@ -266,12 +320,23 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
     private fun appendSafetyExtraTemplateBlocks(parent: org.jsoup.nodes.Element, content: TemplateContent, todayIso: String, profile: UserProfile?) {
         content.blocks.filterNot { it is TemplateBlock.Date }.forEach { block ->
             when (block) {
-                is TemplateBlock.Text -> parent.appendElement("div").addClass("text-block").appendElement("p").text(block.text)
+                is TemplateBlock.Text -> {
+                    val div = parent.appendElement("div").addClass("text-block")
+                    applyBlockStyle(div, block.settings)
+                    div.appendElement("p").text(block.text)
+                }
                 is TemplateBlock.Table -> appendEditableTable(parent, block)
                 is TemplateBlock.Signature -> appendSignature(parent, profile)
                 is TemplateBlock.Stamp -> appendStamp(parent, profile)
-                is TemplateBlock.Images -> appendImagesAnchor(parent)
+                is TemplateBlock.Images -> appendImagesAnchor(parent, block, todayIso, profile)
+                is TemplateBlock.Image -> appendImageComponent(parent)
                 is TemplateBlock.PageBreak -> appendPageBreak(parent)
+                is TemplateBlock.PageNumber -> {
+                    val span = parent.appendElement("span").addClass("page-number").text("1")
+                    applyBlockStyle(span, block.settings, forceBlock = true)
+                }
+                is TemplateBlock.Header -> block.blocks.forEach { appendTemplateBlock(parent, it, todayIso, profile) }
+                is TemplateBlock.Footer -> block.blocks.forEach { appendTemplateBlock(parent, it, todayIso, profile) }
                 is TemplateBlock.Html -> appendHtmlBlock(parent, block)
                 is TemplateBlock.Date -> parent.appendElement("div").addClass("date-block").text(todayIso)
             }
@@ -537,6 +602,7 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
     private companion object {
         const val CONTENT_ID = "content"
         const val SAFETY_CLASS = "safety-walkthrough"
+        const val PAGE_NUMBER_TOKEN = "{{oldalszam}}"
 
         val INDENTED_CHECKLIST_ITEMS = setOf(
             "hegesztés, nyílt láng, szikra",

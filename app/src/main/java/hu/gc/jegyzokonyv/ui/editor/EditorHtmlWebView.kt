@@ -316,22 +316,21 @@ private fun resolveDraftImage(draftDir: File, src: String): File? {
 
 private fun previewDataUri(image: File): String? =
     runCatching {
-        val previewBytes = image.previewJpegBytes()
-        val (mimeType, bytes) = if (previewBytes != null) {
-            "image/jpeg" to previewBytes
-        } else {
-            (image.imageMimeType() ?: "image/jpeg") to image.readBytes()
-        }
+        val preview = image.previewImageBytes()
+        val (mimeType, bytes) = preview ?: ((image.imageMimeType() ?: "image/jpeg") to image.readBytes())
         "data:$mimeType;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
     }.getOrNull()
 
-private fun File.previewJpegBytes(): ByteArray? {
+private fun File.previewImageBytes(): Pair<String, ByteArray>? {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeFile(absolutePath, bounds)
     if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
 
     val sampleSize = calculateInSampleSize(bounds.outWidth, bounds.outHeight, MAX_PREVIEW_IMAGE_SIDE)
-    val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+    val options = BitmapFactory.Options().apply {
+        inSampleSize = sampleSize
+        inPreferredConfig = Bitmap.Config.ARGB_8888
+    }
     val decoded = BitmapFactory.decodeFile(absolutePath, options) ?: return null
     val oriented = decoded.applyExifOrientation(readExifOrientation())
     if (oriented !== decoded) decoded.recycle()
@@ -340,9 +339,13 @@ private fun File.previewJpegBytes(): ByteArray? {
     if (scaled !== oriented) oriented.recycle()
 
     return java.io.ByteArrayOutputStream().use { output ->
-        scaled.compress(Bitmap.CompressFormat.JPEG, PREVIEW_JPEG_QUALITY, output)
+        val hasAlpha = scaled.hasAlpha()
+        val format = if (hasAlpha) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG
+        val mimeType = if (hasAlpha) "image/png" else "image/jpeg"
+        val quality = if (hasAlpha) 100 else PREVIEW_JPEG_QUALITY
+        scaled.compress(format, quality, output)
         if (!scaled.isRecycled) scaled.recycle()
-        output.toByteArray()
+        mimeType to output.toByteArray()
     }
 }
 

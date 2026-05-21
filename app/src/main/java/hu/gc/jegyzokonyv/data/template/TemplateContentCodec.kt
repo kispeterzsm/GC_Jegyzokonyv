@@ -12,47 +12,7 @@ import java.util.UUID
 object TemplateContentCodec {
 
     fun encode(content: TemplateContent): String {
-        val blocksArray = JSONArray()
-        content.blocks.forEach { block ->
-            val obj = JSONObject()
-            obj.put("id", block.id)
-            when (block) {
-                is TemplateBlock.Text -> {
-                    obj.put("type", "text")
-                    obj.put("text", block.text)
-                }
-                is TemplateBlock.Date -> {
-                    obj.put("type", "date")
-                }
-                is TemplateBlock.Table -> {
-                    obj.put("type", "table")
-                    obj.put("rows", block.rows)
-                    obj.put("columns", block.columns)
-                    obj.put("hasHeaderColumn", block.hasHeaderColumn)
-                    obj.put("cells", JSONArray(block.cells.map { row -> JSONArray(row) }))
-                    obj.put("rowSettings", JSONArray(block.rowSettings.map { it.toJson() }))
-                    obj.put("columnSettings", JSONArray(block.columnSettings.map { it.toJson() }))
-                    obj.put("cellSettings", JSONArray(block.cellSettings.map { row -> JSONArray(row.map { it.toJson() }) }))
-                }
-                is TemplateBlock.Signature -> {
-                    obj.put("type", "signature")
-                }
-                is TemplateBlock.Stamp -> {
-                    obj.put("type", "stamp")
-                }
-                is TemplateBlock.Images -> {
-                    obj.put("type", "images")
-                }
-                is TemplateBlock.PageBreak -> {
-                    obj.put("type", "page_break")
-                }
-                is TemplateBlock.Html -> {
-                    obj.put("type", "html")
-                    obj.put("html", block.html)
-                }
-            }
-            blocksArray.put(obj)
-        }
+        val blocksArray = JSONArray(content.blocks.map { it.toJson() })
         val root = JSONObject()
             .put("title", content.title)
             .put("kind", content.kind.jsonValue)
@@ -66,61 +26,116 @@ object TemplateContentCodec {
         val title = root.optString("title", "")
         val kind = TemplateKind.fromJson(root.optString("kind", TemplateKind.Standard.jsonValue))
         val blocksJson = root.optJSONArray("blocks") ?: JSONArray()
-        val blocks = buildList {
-            for (i in 0 until blocksJson.length()) {
-                val obj = blocksJson.optJSONObject(i) ?: continue
-                val id = obj.optString("id").ifBlank { UUID.randomUUID().toString() }
-                when (obj.optString("type")) {
-                    "text" -> add(TemplateBlock.Text(id = id, text = obj.optString("text", "")))
-                    "date" -> add(TemplateBlock.Date(id = id))
-                    "table" -> add(
-                        TemplateBlock.Table(
-                            id = id,
-                            rows = obj.optInt("rows", 2).coerceIn(1, 50),
-                            columns = obj.optInt("columns", 2).coerceIn(1, 20),
-                            hasHeaderColumn = obj.optBoolean("hasHeaderColumn", false),
-                            cells = obj.optJSONArray("cells")?.let { cellsJson ->
-                                buildList {
-                                    for (rowIndex in 0 until cellsJson.length()) {
-                                        val rowJson = cellsJson.optJSONArray(rowIndex) ?: JSONArray()
-                                        add(buildList {
-                                            for (colIndex in 0 until rowJson.length()) add(rowJson.optString(colIndex, ""))
-                                        })
-                                    }
-                                }
-                            } ?: emptyList(),
-                            rowSettings = obj.optJSONArray("rowSettings")?.let { settingsJson ->
-                                buildList {
-                                    for (index in 0 until settingsJson.length()) add(settingsJson.optJSONObject(index).toAxisSettings())
-                                }
-                            } ?: emptyList(),
-                            columnSettings = obj.optJSONArray("columnSettings")?.let { settingsJson ->
-                                buildList {
-                                    for (index in 0 until settingsJson.length()) add(settingsJson.optJSONObject(index).toAxisSettings())
-                                }
-                            } ?: emptyList(),
-                            cellSettings = obj.optJSONArray("cellSettings")?.let { settingsJson ->
-                                buildList {
-                                    for (rowIndex in 0 until settingsJson.length()) {
-                                        val rowJson = settingsJson.optJSONArray(rowIndex) ?: JSONArray()
-                                        add(buildList {
-                                            for (colIndex in 0 until rowJson.length()) add(rowJson.optJSONObject(colIndex).toCellSettings())
-                                        })
-                                    }
-                                }
-                            } ?: emptyList(),
-                        )
-                    )
-                    "signature" -> add(TemplateBlock.Signature(id = id))
-                    "stamp" -> add(TemplateBlock.Stamp(id = id))
-                    "images" -> add(TemplateBlock.Images(id = id))
-                    "page_break" -> add(TemplateBlock.PageBreak(id = id))
-                    "html" -> add(TemplateBlock.Html(id = id, html = obj.optString("html", "")))
-                }
-            }
-        }
+        val blocks = blocksJson.toBlocks()
         return TemplateContent(title = title, kind = kind, blocks = blocks)
     }
+
+    private fun TemplateBlock.toJson(): JSONObject = JSONObject().apply {
+        put("id", id)
+        when (val block = this@toJson) {
+            is TemplateBlock.Text -> {
+                put("type", "text")
+                put("text", block.text)
+                put("settings", block.settings.toJson())
+            }
+            is TemplateBlock.Date -> {
+                put("type", "date")
+                put("settings", block.settings.toJson())
+            }
+            is TemplateBlock.Table -> {
+                put("type", "table")
+                put("rows", block.rows)
+                put("columns", block.columns)
+                put("hasHeaderColumn", block.hasHeaderColumn)
+                put("cells", JSONArray(block.cells.map { row -> JSONArray(row) }))
+                put("rowSettings", JSONArray(block.rowSettings.map { it.toJson() }))
+                put("columnSettings", JSONArray(block.columnSettings.map { it.toJson() }))
+                put("cellSettings", JSONArray(block.cellSettings.map { row -> JSONArray(row.map { it.toJson() }) }))
+            }
+            is TemplateBlock.Signature -> put("type", "signature")
+            is TemplateBlock.Stamp -> put("type", "stamp")
+            is TemplateBlock.Images -> {
+                put("type", "images")
+                put("blocks", JSONArray(block.blocks.map { it.toJson() }))
+            }
+            is TemplateBlock.Image -> put("type", "image")
+            is TemplateBlock.PageBreak -> put("type", "page_break")
+            is TemplateBlock.PageNumber -> {
+                put("type", "page_number")
+                put("settings", block.settings.toJson())
+            }
+            is TemplateBlock.Header -> {
+                put("type", "header")
+                put("blocks", JSONArray(block.blocks.map { it.toJson() }))
+            }
+            is TemplateBlock.Footer -> {
+                put("type", "footer")
+                put("blocks", JSONArray(block.blocks.map { it.toJson() }))
+            }
+            is TemplateBlock.Html -> {
+                put("type", "html")
+                put("html", block.html)
+            }
+        }
+    }
+
+    private fun JSONArray.toBlocks(): List<TemplateBlock> = buildList {
+        for (i in 0 until length()) {
+            val obj = optJSONObject(i) ?: continue
+            val id = obj.optString("id").ifBlank { UUID.randomUUID().toString() }
+            when (obj.optString("type")) {
+                "text" -> add(TemplateBlock.Text(id = id, text = obj.optString("text", ""), settings = obj.optJSONObject("settings").toCellSettings()))
+                "date" -> add(TemplateBlock.Date(id = id, settings = obj.optJSONObject("settings").toCellSettings()))
+                "table" -> add(obj.toTableBlock(id))
+                "signature" -> add(TemplateBlock.Signature(id = id))
+                "stamp" -> add(TemplateBlock.Stamp(id = id))
+                "images" -> add(TemplateBlock.Images(id = id, blocks = (obj.optJSONArray("blocks") ?: JSONArray().put(JSONObject().put("type", "image").put("id", "image-component"))).toBlocks()))
+                "image" -> add(TemplateBlock.Image(id = id))
+                "page_break" -> add(TemplateBlock.PageBreak(id = id))
+                "page_number" -> add(TemplateBlock.PageNumber(id = id, settings = obj.optJSONObject("settings").toCellSettings()))
+                "header" -> add(TemplateBlock.Header(id = id, blocks = (obj.optJSONArray("blocks") ?: JSONArray()).toBlocks()))
+                "footer" -> add(TemplateBlock.Footer(id = id, blocks = (obj.optJSONArray("blocks") ?: JSONArray()).toBlocks()))
+                "html" -> add(TemplateBlock.Html(id = id, html = obj.optString("html", "")))
+            }
+        }
+    }
+
+    private fun JSONObject.toTableBlock(id: String) = TemplateBlock.Table(
+        id = id,
+        rows = optInt("rows", 2).coerceIn(1, 50),
+        columns = optInt("columns", 2).coerceIn(1, 20),
+        hasHeaderColumn = optBoolean("hasHeaderColumn", false),
+        cells = optJSONArray("cells")?.let { cellsJson ->
+            buildList {
+                for (rowIndex in 0 until cellsJson.length()) {
+                    val rowJson = cellsJson.optJSONArray(rowIndex) ?: JSONArray()
+                    add(buildList {
+                        for (colIndex in 0 until rowJson.length()) add(rowJson.optString(colIndex, ""))
+                    })
+                }
+            }
+        } ?: emptyList(),
+        rowSettings = optJSONArray("rowSettings")?.let { settingsJson ->
+            buildList {
+                for (index in 0 until settingsJson.length()) add(settingsJson.optJSONObject(index).toAxisSettings())
+            }
+        } ?: emptyList(),
+        columnSettings = optJSONArray("columnSettings")?.let { settingsJson ->
+            buildList {
+                for (index in 0 until settingsJson.length()) add(settingsJson.optJSONObject(index).toAxisSettings())
+            }
+        } ?: emptyList(),
+        cellSettings = optJSONArray("cellSettings")?.let { settingsJson ->
+            buildList {
+                for (rowIndex in 0 until settingsJson.length()) {
+                    val rowJson = settingsJson.optJSONArray(rowIndex) ?: JSONArray()
+                    add(buildList {
+                        for (colIndex in 0 until rowJson.length()) add(rowJson.optJSONObject(colIndex).toCellSettings())
+                    })
+                }
+            }
+        } ?: emptyList(),
+    )
 
     private fun TableAxisSettings.toJson() = JSONObject().apply {
         put("backgroundColor", backgroundColor)
