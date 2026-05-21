@@ -1,5 +1,6 @@
 package hu.gc.jegyzokonyv.ui.templates
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -8,6 +9,9 @@ import hu.gc.jegyzokonyv.domain.model.Template
 import hu.gc.jegyzokonyv.domain.usecase.CreateDraftFromTemplateUseCase
 import hu.gc.jegyzokonyv.domain.usecase.DeleteTemplateUseCase
 import hu.gc.jegyzokonyv.domain.usecase.DuplicateTemplateUseCase
+import hu.gc.jegyzokonyv.domain.usecase.ImportDocxTemplateUseCase
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -20,10 +24,14 @@ class TemplatePickerViewModel @Inject constructor(
     private val createDraft: CreateDraftFromTemplateUseCase,
     private val deleteTemplate: DeleteTemplateUseCase,
     private val duplicateTemplate: DuplicateTemplateUseCase,
+    private val importDocxTemplate: ImportDocxTemplateUseCase,
 ) : ViewModel() {
 
     val templates: StateFlow<List<Template>> = templateRepository.observeTemplates()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val _importErrors = MutableSharedFlow<String>()
+    val importErrors: SharedFlow<String> = _importErrors
 
     fun createDraft(templateId: String, onCreated: (String) -> Unit) {
         viewModelScope.launch {
@@ -42,6 +50,16 @@ class TemplatePickerViewModel @Inject constructor(
     fun delete(templateId: String) {
         viewModelScope.launch {
             deleteTemplate(templateId)
+        }
+    }
+
+    fun importDocx(uri: Uri, onImported: (String) -> Unit) {
+        viewModelScope.launch {
+            runCatching { importDocxTemplate(uri) }
+                .onSuccess(onImported)
+                .onFailure { error ->
+                    _importErrors.emit(error.message ?: "A DOCX importálása nem sikerült.")
+                }
         }
     }
 }

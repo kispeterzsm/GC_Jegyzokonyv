@@ -15,6 +15,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
@@ -25,11 +27,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,9 +59,17 @@ fun TemplatePickerScreen(
     viewModel: TemplatePickerViewModel = hiltViewModel(),
 ) {
     val templates by viewModel.templates.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val docxImportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { viewModel.importDocx(it, onImported = onEditTemplate) }
+    }
     var pendingActions by remember { mutableStateOf<Template?>(null) }
     var pendingDelete by remember { mutableStateOf<Template?>(null) }
     val copySuffix = stringResource(R.string.template_default_copy_suffix)
+
+    LaunchedEffect(viewModel) {
+        viewModel.importErrors.collect { message -> snackbarHostState.showSnackbar(message) }
+    }
 
     Scaffold(
         topBar = {
@@ -70,8 +83,24 @@ fun TemplatePickerScreen(
                         )
                     }
                 },
+                actions = {
+                    TextButton(
+                        onClick = {
+                            docxImportLauncher.launch(
+                                arrayOf(
+                                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                    "application/zip",
+                                    "*/*",
+                                )
+                            )
+                        },
+                    ) {
+                        Text(stringResource(R.string.templates_import_docx))
+                    }
+                },
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = onNewTemplate,

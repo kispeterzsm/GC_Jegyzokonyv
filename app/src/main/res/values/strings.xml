@@ -34,6 +34,7 @@
     <string name="templates_title">Sablon választása</string>
     <string name="templates_empty">Nem található sablon.</string>
     <string name="templates_new_template">Új sablon</string>
+    <string name="templates_import_docx">Import</string>
     <string name="templates_built_in_badge">Beépített</string>
 
     <string name="template_editor_new_title">Új sablon</string>
