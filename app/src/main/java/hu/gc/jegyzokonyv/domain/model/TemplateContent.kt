@@ -33,6 +33,7 @@ sealed class TemplateBlock {
     ) : TemplateBlock()
     data class Signature(override val id: String) : TemplateBlock()
     data class Stamp(override val id: String) : TemplateBlock()
+    data class ProfileData(override val id: String, val field: ProfileDataField) : TemplateBlock()
     data class Images(override val id: String, val blocks: List<TemplateBlock> = listOf(Image(id = "image-component"))) : TemplateBlock()
     data class Image(override val id: String) : TemplateBlock()
     data class PageBreak(override val id: String) : TemplateBlock()
@@ -40,6 +41,18 @@ sealed class TemplateBlock {
     data class Header(override val id: String, val blocks: List<TemplateBlock> = emptyList()) : TemplateBlock()
     data class Footer(override val id: String, val blocks: List<TemplateBlock> = emptyList()) : TemplateBlock()
     data class Html(override val id: String, val html: String) : TemplateBlock()
+}
+
+enum class ProfileDataField(val jsonValue: String) {
+    Name("name"),
+    CompanyName("company_name"),
+    Phone("phone"),
+    Email("email");
+
+    companion object {
+        fun fromJson(value: String): ProfileDataField =
+            entries.firstOrNull { it.jsonValue == value } ?: Name
+    }
 }
 
 data class TableAxisSettings(

@@ -186,7 +186,7 @@ class ExportPdfUseCase @Inject constructor(
     private fun Element.toExportTableCell(text: String): ExportTableCell {
         val style = parseStyle(attr("style"))
         return ExportTableCell(
-            text = text,
+            text = attr("data-page-number-template").ifBlank { text },
             colSpan = attr("colspan").toIntOrNull()?.coerceAtLeast(1) ?: 1,
             rowSpan = attr("rowspan").toIntOrNull()?.coerceAtLeast(1) ?: 1,
             backgroundColor = parseCssColor(style["background"] ?: style["background-color"]),
@@ -1009,23 +1009,38 @@ class ExportPdfUseCase @Inject constructor(
         }
 
         private fun drawProfileImageBlock(block: ExportBlock.ProfileImage) {
-            val image = block.image ?: run {
-                if (block.label.isNotBlank()) drawWrappedText(block.label, bodyPaint, spacingAfter = 12f)
-                return
-            }
-            val bounds = decodeImageBounds(image) ?: return
             val width = if (block.signature) 170f else 140f
             val height = if (block.signature) 70f else 95f
-            if (y + height + 24f > currentBottomY) {
+            val labelLayout = block.label
+                .takeIf { block.signature && it.isNotBlank() }
+                ?.let { staticLayout(it, bodyPaint, width.roundToInt(), alignment = Layout.Alignment.ALIGN_CENTER) }
+            val labelHeight = labelLayout?.height?.toFloat() ?: 0f
+            val blockHeight = (if (block.image != null) height else 0f) +
+                if (block.signature) 4f + labelHeight + 10f else 12f
+            if (y + blockHeight > currentBottomY) {
                 if (allowPagination) startPage() else return
             }
+
             val left = PAGE_WIDTH_PT - PAGE_MARGIN_PT - width
-            if (drawBitmap(image, bounds, readOrientation(image), RectF(left, y, left + width, y + height))) imageCount += 1
-            y += height
+            val image = block.image
+            if (image != null) {
+                val bounds = decodeImageBounds(image)
+                if (bounds != null && drawBitmap(image, bounds, readOrientation(image), RectF(left, y, left + width, y + height))) {
+                    imageCount += 1
+                }
+                y += height
+            } else if (!block.signature) {
+                return
+            }
+
             if (block.signature) {
                 canvas.drawLine(left, y, left + width, y, linePaint)
                 y += 4f
-                if (block.label.isNotBlank()) drawWrappedText(block.label, bodyPaint, spacingAfter = 10f)
+                labelLayout?.let {
+                    drawStaticLayout(it, left, y)
+                    y += it.height.toFloat()
+                }
+                y += 10f
             } else {
                 y += 12f
             }

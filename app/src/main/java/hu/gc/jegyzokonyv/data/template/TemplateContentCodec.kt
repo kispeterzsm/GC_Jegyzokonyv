@@ -54,6 +54,10 @@ object TemplateContentCodec {
             }
             is TemplateBlock.Signature -> put("type", "signature")
             is TemplateBlock.Stamp -> put("type", "stamp")
+            is TemplateBlock.ProfileData -> {
+                put("type", "profile_data")
+                put("field", block.field.jsonValue)
+            }
             is TemplateBlock.Images -> {
                 put("type", "images")
                 put("blocks", JSONArray(block.blocks.map { it.toJson() }))
@@ -89,6 +93,7 @@ object TemplateContentCodec {
                 "table" -> add(obj.toTableBlock(id))
                 "signature" -> add(TemplateBlock.Signature(id = id))
                 "stamp" -> add(TemplateBlock.Stamp(id = id))
+                "profile_data" -> add(TemplateBlock.ProfileData(id = id, field = hu.gc.jegyzokonyv.domain.model.ProfileDataField.fromJson(obj.optString("field"))))
                 "images" -> add(TemplateBlock.Images(id = id, blocks = (obj.optJSONArray("blocks") ?: JSONArray().put(JSONObject().put("type", "image").put("id", "image-component"))).toBlocks()))
                 "image" -> add(TemplateBlock.Image(id = id))
                 "page_break" -> add(TemplateBlock.PageBreak(id = id))

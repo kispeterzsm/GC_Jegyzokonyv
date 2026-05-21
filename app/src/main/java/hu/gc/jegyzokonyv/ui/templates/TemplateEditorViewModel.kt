@@ -7,6 +7,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import hu.gc.jegyzokonyv.data.profile.ProfileRepository
 import hu.gc.jegyzokonyv.data.repo.TemplateRepository
 import hu.gc.jegyzokonyv.domain.html.HtmlEngine
+import hu.gc.jegyzokonyv.domain.model.ProfileDataField
 import hu.gc.jegyzokonyv.domain.model.TableAxisSettings
 import hu.gc.jegyzokonyv.domain.model.TableCellSettings
 import hu.gc.jegyzokonyv.domain.model.TemplateBlock
@@ -236,6 +237,11 @@ class TemplateEditorViewModel @Inject constructor(
     fun addStampBlock() {
         if (_state.value.isReadOnly) return
         addBlockBelowImages(TemplateBlock.Stamp(id = UUID.randomUUID().toString()))
+    }
+
+    fun addProfileDataBlock(field: ProfileDataField) {
+        if (_state.value.isReadOnly) return
+        addBlockAboveImages(TemplateBlock.ProfileData(id = UUID.randomUUID().toString(), field = field))
     }
 
     fun addPageBreakBlock() {

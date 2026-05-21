@@ -13,11 +13,15 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -58,12 +62,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import hu.gc.jegyzokonyv.R
+import hu.gc.jegyzokonyv.domain.model.ProfileDataField
 import hu.gc.jegyzokonyv.domain.model.TableAxisSettings
 import hu.gc.jegyzokonyv.domain.model.TableCellSettings
 import hu.gc.jegyzokonyv.domain.model.TemplateBlock
@@ -164,6 +170,7 @@ fun TemplateEditorScreen(
                         onAddTable = { showTableDialog = true },
                         onAddSignature = viewModel::addSignatureBlock,
                         onAddStamp = viewModel::addStampBlock,
+                        onAddProfileData = viewModel::addProfileDataBlock,
                         onAddPageBreak = viewModel::addPageBreakBlock,
                         onAddHeader = viewModel::addHeaderBlock,
                         onAddFooter = viewModel::addFooterBlock,
@@ -299,6 +306,7 @@ private fun AddElementsSection(
     onAddTable: () -> Unit,
     onAddSignature: () -> Unit,
     onAddStamp: () -> Unit,
+    onAddProfileData: (ProfileDataField) -> Unit,
     onAddPageBreak: () -> Unit,
     onAddHeader: () -> Unit,
     onAddFooter: () -> Unit,
@@ -347,6 +355,14 @@ private fun AddElementsSection(
                         AddElementButton(text = "Bélyegző", icon = Icons.Filled.Check, onClick = onAddStamp, modifier = Modifier.weight(1f))
                     }
                     AddElementButtonRow {
+                        AddElementButton(text = "Profil név", icon = Icons.Filled.Draw, onClick = { onAddProfileData(ProfileDataField.Name) }, modifier = Modifier.weight(1f))
+                        AddElementButton(text = "Profil cégnév", icon = Icons.Filled.Draw, onClick = { onAddProfileData(ProfileDataField.CompanyName) }, modifier = Modifier.weight(1f))
+                    }
+                    AddElementButtonRow {
+                        AddElementButton(text = "Profil telefon", icon = Icons.Filled.Draw, onClick = { onAddProfileData(ProfileDataField.Phone) }, modifier = Modifier.weight(1f))
+                        AddElementButton(text = "Profil email", icon = Icons.Filled.Draw, onClick = { onAddProfileData(ProfileDataField.Email) }, modifier = Modifier.weight(1f))
+                    }
+                    AddElementButtonRow {
                         AddElementButton(text = "Oldaltörés", icon = Icons.Filled.InsertPageBreak, onClick = onAddPageBreak, modifier = Modifier.weight(1f))
                     }
                 }
@@ -386,6 +402,13 @@ private fun AddElementsSection(
 }
 
 private enum class AddElementPage { Default, HeaderFooter, Photos }
+
+private fun ProfileDataField.displayLabel(): String = when (this) {
+    ProfileDataField.Name -> "Név"
+    ProfileDataField.CompanyName -> "Cégnév"
+    ProfileDataField.Phone -> "Telefon"
+    ProfileDataField.Email -> "Email"
+}
 
 @Composable
 private fun AddElementPageButton(
@@ -476,6 +499,7 @@ private fun BlockRow(
         is TemplateBlock.Table -> "Táblázat: ${block.rows.coerceIn(1, 50)} sor × ${block.columns.coerceIn(1, 20)} oszlop"
         is TemplateBlock.Signature -> "Aláírás a profilból"
         is TemplateBlock.Stamp -> "Bélyegző a profilból"
+        is TemplateBlock.ProfileData -> "Profil adat: ${block.field.displayLabel()}"
         is TemplateBlock.Images -> "Fotóoldal sablon (nem törölhető)"
         is TemplateBlock.Image -> "Kép helye"
         is TemplateBlock.PageBreak -> "Oldaltörés / új oldal"
@@ -487,7 +511,7 @@ private fun BlockRow(
     val icon = when (block) {
         is TemplateBlock.Date -> Icons.Filled.DateRange
         is TemplateBlock.Table, is TemplateBlock.Header, is TemplateBlock.Footer, is TemplateBlock.Html -> Icons.Filled.GridOn
-        is TemplateBlock.Signature, is TemplateBlock.Text -> Icons.Filled.Draw
+        is TemplateBlock.Signature, is TemplateBlock.Text, is TemplateBlock.ProfileData -> Icons.Filled.Draw
         is TemplateBlock.Stamp -> Icons.Filled.Check
         is TemplateBlock.Images, is TemplateBlock.Image -> Icons.Filled.Image
         is TemplateBlock.PageBreak, is TemplateBlock.PageNumber -> Icons.Filled.InsertPageBreak
@@ -659,18 +683,24 @@ private fun TableSettingsDialog(
         onDismissRequest = onDismiss,
         title = { Text("Táblázat beállításai") },
         text = {
-            TableBlockEditor(
-                block = block,
-                readOnly = readOnly,
-                onCellTextChange = onCellTextChange,
-                onRowSettingsChange = onRowSettingsChange,
-                onColumnSettingsChange = onColumnSettingsChange,
-                onCellSettingsChange = onCellSettingsChange,
-                onInsertRowBelow = onInsertRowBelow,
-                onInsertColumnRight = onInsertColumnRight,
-                onDeleteRow = onDeleteRow,
-                onDeleteColumn = onDeleteColumn,
-            )
+            Box(
+                modifier = Modifier
+                    .heightIn(max = 520.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                TableBlockEditor(
+                    block = block,
+                    readOnly = readOnly,
+                    onCellTextChange = onCellTextChange,
+                    onRowSettingsChange = onRowSettingsChange,
+                    onColumnSettingsChange = onColumnSettingsChange,
+                    onCellSettingsChange = onCellSettingsChange,
+                    onInsertRowBelow = onInsertRowBelow,
+                    onInsertColumnRight = onInsertColumnRight,
+                    onDeleteRow = onDeleteRow,
+                    onDeleteColumn = onDeleteColumn,
+                )
+            }
         },
         confirmButton = { Button(onClick = onDismiss) { Text(stringResource(R.string.action_save)) } },
         dismissButton = {
@@ -700,6 +730,8 @@ private fun TableBlockEditor(
     var rowDialog by remember(block.id) { mutableStateOf<Int?>(null) }
     var columnDialog by remember(block.id) { mutableStateOf<Int?>(null) }
     var cellDialog by remember(block.id) { mutableStateOf<Pair<Int, Int>?>(null) }
+    val scrollHorizontally = columns > 5
+    val horizontalScrollState = rememberScrollState()
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         BlockLabel(
@@ -710,33 +742,47 @@ private fun TableBlockEditor(
             text = "Koppints az oszlop nyílra, sor nyílra vagy cellára a beállítások szerkesztéséhez.",
             style = MaterialTheme.typography.bodySmall,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-            Spacer(Modifier.width(42.dp))
-            repeat(columns) { columnIndex ->
-                val isTickColumn = (0 until rows).any { row -> block.cellSettings.getOrNull(row)?.getOrNull(columnIndex)?.toggleCheck == true }
-                SettingsArrow(
-                    text = "↓",
-                    onClick = { if (!readOnly) columnDialog = columnIndex },
-                    modifier = if (isTickColumn) Modifier.width(46.dp) else Modifier.weight(1f),
-                )
-            }
-        }
-        repeat(rows) { rowIndex ->
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                SettingsArrow(
-                    text = "→",
-                    onClick = { if (!readOnly) rowDialog = rowIndex },
-                    modifier = Modifier.width(42.dp).heightIn(min = 64.dp),
-                )
+        Column(
+            modifier = if (scrollHorizontally) Modifier.horizontalScroll(horizontalScrollState) else Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = if (scrollHorizontally) Modifier else Modifier.fillMaxWidth()) {
+                Spacer(Modifier.width(42.dp))
                 repeat(columns) { columnIndex ->
-                    val cellSettings = block.cellSettings.getOrNull(rowIndex)?.getOrNull(columnIndex)
-                    CellPreview(
-                        value = block.cells.getOrNull(rowIndex)?.getOrNull(columnIndex).orEmpty(),
-                        label = "${rowIndex + 1}.${columnIndex + 1}",
-                        enabled = !readOnly,
-                        onClick = { if (!readOnly) cellDialog = rowIndex to columnIndex },
-                        modifier = if (cellSettings?.toggleCheck == true) Modifier.width(46.dp) else Modifier.weight(1f),
+                    val isTickColumn = (0 until rows).any { row -> block.cellSettings.getOrNull(row)?.getOrNull(columnIndex)?.toggleCheck == true }
+                    SettingsArrow(
+                        text = "↓",
+                        onClick = { if (!readOnly) columnDialog = columnIndex },
+                        modifier = when {
+                            scrollHorizontally -> Modifier.width(if (isTickColumn) 46.dp else 96.dp)
+                            isTickColumn -> Modifier.width(46.dp)
+                            else -> Modifier.weight(1f)
+                        },
                     )
+                }
+            }
+            repeat(rows) { rowIndex ->
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = if (scrollHorizontally) Modifier else Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    SettingsArrow(
+                        text = "→",
+                        onClick = { if (!readOnly) rowDialog = rowIndex },
+                        modifier = Modifier.width(42.dp).heightIn(min = 64.dp),
+                    )
+                    repeat(columns) { columnIndex ->
+                        val cellSettings = block.cellSettings.getOrNull(rowIndex)?.getOrNull(columnIndex)
+                        val isTickCell = cellSettings?.toggleCheck == true
+                        CellPreview(
+                            value = block.cells.getOrNull(rowIndex)?.getOrNull(columnIndex).orEmpty(),
+                            label = "${rowIndex + 1}.${columnIndex + 1}",
+                            enabled = !readOnly,
+                            onClick = { if (!readOnly) cellDialog = rowIndex to columnIndex },
+                            modifier = when {
+                                scrollHorizontally -> Modifier.width(if (isTickCell) 46.dp else 96.dp)
+                                isTickCell -> Modifier.width(46.dp)
+                                else -> Modifier.weight(1f)
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -819,14 +865,25 @@ private fun CellPreview(
 ) {
     Column(
         modifier = modifier
-            .heightIn(min = 64.dp)
+            .height(64.dp)
             .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(6.dp))
             .combinedClickable(onClick = onClick, enabled = enabled)
             .padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-        Text(value.ifBlank { " " }, style = MaterialTheme.typography.bodyMedium)
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = value.ifBlank { " " },
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -864,7 +921,12 @@ private fun AxisSettingsDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 520.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 ColorSettingButtons(
                     backgroundColor = draft.backgroundColor,
                     textColor = draft.textColor,
@@ -920,11 +982,17 @@ private fun CellSettingsDialog(
 ) {
     var draftText by remember(text) { mutableStateOf(text) }
     var draft by remember(settings) { mutableStateOf(settings) }
+    var showSpecialDialog by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 520.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 if (draft.toggleCheck) {
                     Text("Alapértelmezett érték", style = MaterialTheme.typography.labelLarge)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -943,8 +1011,8 @@ private fun CellSettingsDialog(
                             label = { Text("Cella szövege") },
                             modifier = Modifier.weight(1f),
                         )
-                        OutlinedButton(onClick = { draftText += PAGE_NUMBER_TOKEN }) {
-                            Text("Oldalszám")
+                        OutlinedButton(onClick = { showSpecialDialog = true }) {
+                            Text("Speciális")
                         }
                     }
                 }
@@ -991,6 +1059,44 @@ private fun CellSettingsDialog(
         confirmButton = { Button(onClick = { onConfirm(draftText, draft) }) { Text(stringResource(R.string.action_save)) } },
         dismissButton = { OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
+
+    if (showSpecialDialog) {
+        SpecialCellElementDialog(
+            onDismiss = { showSpecialDialog = false },
+            onInsert = { token ->
+                draftText += token
+                showSpecialDialog = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun SpecialCellElementDialog(
+    onDismiss: () -> Unit,
+    onInsert: (String) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Speciális elem beszúrása") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SpecialElementButton("Oldalszám") { onInsert(PAGE_NUMBER_TOKEN) }
+                SpecialElementButton("Dátum") { onInsert(DATE_TOKEN) }
+                SpecialElementButton("Profil név") { onInsert(PROFILE_NAME_TOKEN) }
+                SpecialElementButton("Profil cégnév") { onInsert(PROFILE_COMPANY_TOKEN) }
+                SpecialElementButton("Profil telefon") { onInsert(PROFILE_PHONE_TOKEN) }
+                SpecialElementButton("Profil email") { onInsert(PROFILE_EMAIL_TOKEN) }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+    )
+}
+
+@Composable
+private fun SpecialElementButton(text: String, onClick: () -> Unit) {
+    OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) { Text(text) }
 }
 
 @Composable
@@ -1137,6 +1243,11 @@ private fun ColorSlider(label: String, value: Int, onChange: (Int) -> Unit) {
 }
 
 private const val PAGE_NUMBER_TOKEN = "{{oldalszam}}"
+private const val DATE_TOKEN = "{{datum}}"
+private const val PROFILE_NAME_TOKEN = "{{profil_nev}}"
+private const val PROFILE_COMPANY_TOKEN = "{{profil_cegnev}}"
+private const val PROFILE_PHONE_TOKEN = "{{profil_telefon}}"
+private const val PROFILE_EMAIL_TOKEN = "{{profil_email}}"
 
 private val PRESET_COLORS = listOf(
     "Piros" to "#FF0000",
@@ -1200,6 +1311,7 @@ private fun ContainerBlockLabel(
                     is TemplateBlock.Table -> "Táblázat: ${block.rows.coerceIn(1, 50)} sor × ${block.columns.coerceIn(1, 20)} oszlop"
                     is TemplateBlock.Signature -> "Aláírás"
                     is TemplateBlock.Stamp -> "Bélyegző"
+                    is TemplateBlock.ProfileData -> "Profil adat: ${block.field.displayLabel()}"
                     is TemplateBlock.Images -> "Fotók"
                     is TemplateBlock.Image -> "Kép"
                     is TemplateBlock.PageBreak -> "Oldaltörés"
@@ -1300,7 +1412,12 @@ private fun StyledBlockSettingsDialog(
         onDismissRequest = onDismiss,
         title = { Text("Szín és igazítás") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 520.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 ColorSettingButtons(
                     backgroundColor = draft.backgroundColor,
                     textColor = draft.textColor,

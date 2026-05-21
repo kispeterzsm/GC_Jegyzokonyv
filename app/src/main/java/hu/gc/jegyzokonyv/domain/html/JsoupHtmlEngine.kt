@@ -84,9 +84,10 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
                 val div = parent.appendElement("div").addClass("date-block").text(todayIso)
                 applyBlockStyle(div, block.settings)
             }
-            is TemplateBlock.Table -> appendEditableTable(parent, block)
+            is TemplateBlock.Table -> appendEditableTable(parent, block, todayIso, profile)
             is TemplateBlock.Signature -> appendSignature(parent, profile)
             is TemplateBlock.Stamp -> appendStamp(parent, profile)
+            is TemplateBlock.ProfileData -> appendProfileData(parent, block, profile)
             is TemplateBlock.Images -> appendImagesAnchor(parent, block, todayIso, profile)
             is TemplateBlock.Image -> appendImageComponent(parent)
             is TemplateBlock.PageBreak -> appendPageBreak(parent)
@@ -128,7 +129,7 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
         if (styles.isNotEmpty()) element.attr("style", styles.joinToString(";"))
     }
 
-    private fun appendEditableTable(parent: org.jsoup.nodes.Element, block: TemplateBlock.Table) {
+    private fun appendEditableTable(parent: org.jsoup.nodes.Element, block: TemplateBlock.Table, todayIso: String, profile: UserProfile?) {
         val table = parent.appendElement("table")
             .addClass("editable-table")
             .attr("data-template-block-id", block.id)
@@ -199,13 +200,41 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
                 if (style.isNotBlank()) cell.attr("style", style)
                 if (cellSettings.hideIfEmpty) cell.attr("data-hide-if-empty", "true")
                 if (columnSettings.hideIfEmpty) cell.attr("data-hide-column-if-empty", "true")
-                cell.text(block.cells.getOrNull(rowIndex)?.getOrNull(colIndex).orEmpty().replace(PAGE_NUMBER_TOKEN, "1"))
+                val cellText = block.cells.getOrNull(rowIndex)?.getOrNull(colIndex).orEmpty()
+                if (cellText.contains(PAGE_NUMBER_TOKEN)) {
+                    cell.attr("data-page-number-template", replaceSpecialTokens(cellText, PAGE_NUMBER_TOKEN, todayIso, profile))
+                }
+                cell.text(replaceSpecialTokens(cellText, "1", todayIso, profile))
             }
         }
     }
 
     private fun TemplateBlock.Table.tableCellSettings(row: Int, column: Int): TableCellSettings =
         cellSettings.getOrNull(row)?.getOrNull(column) ?: TableCellSettings()
+
+    private fun replaceSpecialTokens(text: String, pageNumber: String, todayIso: String, profile: UserProfile?): String =
+        text.replace(PAGE_NUMBER_TOKEN, pageNumber)
+            .replace(DATE_TOKEN, todayIso)
+            .replace(PROFILE_NAME_TOKEN, profile?.name.orEmpty())
+            .replace(PROFILE_COMPANY_TOKEN, profile?.companyName.orEmpty())
+            .replace(PROFILE_PHONE_TOKEN, profile?.phone.orEmpty())
+            .replace(PROFILE_EMAIL_TOKEN, profile?.email.orEmpty())
+
+    private fun appendProfileData(parent: org.jsoup.nodes.Element, block: TemplateBlock.ProfileData, profile: UserProfile?) {
+        parent.appendElement("div")
+            .addClass("text-block")
+            .addClass("profile-data-block")
+            .attr("data-profile-field", block.field.jsonValue)
+            .appendElement("p")
+            .text(block.field.valueFrom(profile))
+    }
+
+    private fun hu.gc.jegyzokonyv.domain.model.ProfileDataField.valueFrom(profile: UserProfile?): String = when (this) {
+        hu.gc.jegyzokonyv.domain.model.ProfileDataField.Name -> profile?.name.orEmpty()
+        hu.gc.jegyzokonyv.domain.model.ProfileDataField.CompanyName -> profile?.companyName.orEmpty()
+        hu.gc.jegyzokonyv.domain.model.ProfileDataField.Phone -> profile?.phone.orEmpty()
+        hu.gc.jegyzokonyv.domain.model.ProfileDataField.Email -> profile?.email.orEmpty()
+    }
 
     private fun appendSignature(parent: org.jsoup.nodes.Element, profile: UserProfile?) {
         val block = parent.appendElement("div").addClass("signature-block")
@@ -329,9 +358,10 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
         content.blocks.filterNot { it is TemplateBlock.Date }.forEach { block ->
             when (block) {
                 is TemplateBlock.Text -> appendTextTemplateBlock(parent, block)
-                is TemplateBlock.Table -> appendEditableTable(parent, block)
+                is TemplateBlock.Table -> appendEditableTable(parent, block, todayIso, profile)
                 is TemplateBlock.Signature -> appendSignature(parent, profile)
                 is TemplateBlock.Stamp -> appendStamp(parent, profile)
+                is TemplateBlock.ProfileData -> appendProfileData(parent, block, profile)
                 is TemplateBlock.Images -> appendImagesAnchor(parent, block, todayIso, profile)
                 is TemplateBlock.Image -> appendImageComponent(parent)
                 is TemplateBlock.PageBreak -> appendPageBreak(parent)
@@ -611,6 +641,11 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
         const val CONTENT_ID = "content"
         const val SAFETY_CLASS = "safety-walkthrough"
         const val PAGE_NUMBER_TOKEN = "{{oldalszam}}"
+        const val DATE_TOKEN = "{{datum}}"
+        const val PROFILE_NAME_TOKEN = "{{profil_nev}}"
+        const val PROFILE_COMPANY_TOKEN = "{{profil_cegnev}}"
+        const val PROFILE_PHONE_TOKEN = "{{profil_telefon}}"
+        const val PROFILE_EMAIL_TOKEN = "{{profil_email}}"
 
         val INDENTED_CHECKLIST_ITEMS = setOf(
             "hegesztés, nyílt láng, szikra",
