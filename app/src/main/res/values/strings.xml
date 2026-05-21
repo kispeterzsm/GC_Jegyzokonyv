@@ -85,9 +85,6 @@
 
     <string name="dialog_add_text_title">Szöveg hozzáadása</string>
     <string name="dialog_add_text_hint">Szöveg</string>
-    <string name="dialog_caption_title">Képaláírás</string>
-    <string name="dialog_caption_hint">Képaláírás (nem kötelező)</string>
-    <string name="dialog_caption_skip">Kihagyás</string>
 
     <string name="camera_permission_required">A fotó készítéséhez kamera-engedély szükséges.</string>
     <string name="camera_permission_grant">Engedély megadása</string>

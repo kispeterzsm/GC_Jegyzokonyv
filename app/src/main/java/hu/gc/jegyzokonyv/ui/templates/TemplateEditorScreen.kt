@@ -96,7 +96,7 @@ fun TemplateEditorScreen(
     var showFooterTableDialog by remember { mutableStateOf(false) }
     var showImageTableDialog by remember { mutableStateOf(false) }
     var showChecklistDialog by remember { mutableStateOf(false) }
-    val previewHtml = remember(state, todayIso) { viewModel.previewHtml(todayIso) }
+    val previewHtml = remember(state.title, state.name, state.kind, state.blocks, todayIso) { viewModel.previewHtml(todayIso) }
 
     Scaffold(
         topBar = {
@@ -1186,7 +1186,7 @@ private fun ContainerBlockLabel(
 ) {
     var styleDialog by remember(title) { mutableStateOf<Pair<String, TableCellSettings>?>(null) }
     var styleConfirm by remember(title) { mutableStateOf<(String, TableCellSettings) -> Unit>({ _, _ -> }) }
-    var tableDialog by remember(title) { mutableStateOf<TemplateBlock.Table?>(null) }
+    var tableDialogId by remember(title) { mutableStateOf<String?>(null) }
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(title, style = MaterialTheme.typography.bodySmall)
@@ -1229,7 +1229,7 @@ private fun ContainerBlockLabel(
                             is TemplateBlock.Text -> IconButton(onClick = { styleConfirm = onTextSettingsChange; styleDialog = block.id to block.settings }) { Icon(Icons.Filled.Settings, contentDescription = "Beállítások") }
                             is TemplateBlock.Date -> IconButton(onClick = { styleConfirm = onDateSettingsChange; styleDialog = block.id to block.settings }) { Icon(Icons.Filled.Settings, contentDescription = "Beállítások") }
                             is TemplateBlock.PageNumber -> IconButton(onClick = { styleConfirm = onPageNumberSettingsChange; styleDialog = block.id to block.settings }) { Icon(Icons.Filled.Settings, contentDescription = "Beállítások") }
-                            is TemplateBlock.Table -> IconButton(onClick = { tableDialog = block }) { Icon(Icons.Filled.Settings, contentDescription = "Beállítások") }
+                            is TemplateBlock.Table -> IconButton(onClick = { tableDialogId = block.id }) { Icon(Icons.Filled.Settings, contentDescription = "Beállítások") }
                             else -> Unit
                         }
                         IconButton(onClick = { onMoveBlockUp(block.id) }) {
@@ -1257,24 +1257,29 @@ private fun ContainerBlockLabel(
             },
         )
     }
-    tableDialog?.let { table ->
-        TableSettingsDialog(
-            block = table,
-            readOnly = readOnly,
-            onDismiss = { tableDialog = null },
-            onDelete = {
-                tableDialog = null
-                onDeleteBlock(table.id)
-            },
-            onCellTextChange = { row, column, value -> onTableCellTextChange(table.id, row, column, value) },
-            onRowSettingsChange = { row, settings -> onTableRowSettingsChange(table.id, row, settings) },
-            onColumnSettingsChange = { column, settings -> onTableColumnSettingsChange(table.id, column, settings) },
-            onCellSettingsChange = { row, column, settings -> onTableCellSettingsChange(table.id, row, column, settings) },
-            onInsertRowBelow = { row -> onInsertRowBelow(table.id, row) },
-            onInsertColumnRight = { column -> onInsertColumnRight(table.id, column) },
-            onDeleteRow = { row -> onDeleteRow(table.id, row) },
-            onDeleteColumn = { column -> onDeleteColumn(table.id, column) },
-        )
+    tableDialogId?.let { tableId ->
+        val table = blocks.filterIsInstance<TemplateBlock.Table>().firstOrNull { it.id == tableId }
+        if (table == null) {
+            tableDialogId = null
+        } else {
+            TableSettingsDialog(
+                block = table,
+                readOnly = readOnly,
+                onDismiss = { tableDialogId = null },
+                onDelete = {
+                    tableDialogId = null
+                    onDeleteBlock(tableId)
+                },
+                onCellTextChange = { row, column, value -> onTableCellTextChange(tableId, row, column, value) },
+                onRowSettingsChange = { row, settings -> onTableRowSettingsChange(tableId, row, settings) },
+                onColumnSettingsChange = { column, settings -> onTableColumnSettingsChange(tableId, column, settings) },
+                onCellSettingsChange = { row, column, settings -> onTableCellSettingsChange(tableId, row, column, settings) },
+                onInsertRowBelow = { row -> onInsertRowBelow(tableId, row) },
+                onInsertColumnRight = { column -> onInsertColumnRight(tableId, column) },
+                onDeleteRow = { row -> onDeleteRow(tableId, row) },
+                onDeleteColumn = { column -> onDeleteColumn(tableId, column) },
+            )
+        }
     }
 }
 
@@ -1303,6 +1308,13 @@ private fun StyledBlockSettingsDialog(
                     onTextColorChange = { draft = draft.copy(textColor = it) },
                 )
                 TextAlignPicker(value = draft.textAlign, onChange = { draft = draft.copy(textAlign = it) })
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        checked = draft.editable == true,
+                        onCheckedChange = { draft = draft.copy(editable = if (it) true else null) },
+                    )
+                    Text("Szerkeszthető szövegmező a jegyzőkönyvben")
+                }
             }
         },
         confirmButton = { Button(onClick = { onConfirm(draft) }) { Text(stringResource(R.string.action_save)) } },

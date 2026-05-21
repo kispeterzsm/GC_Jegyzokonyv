@@ -79,11 +79,7 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
 
     private fun appendTemplateBlock(parent: org.jsoup.nodes.Element, block: TemplateBlock, todayIso: String, profile: UserProfile?) {
         when (block) {
-            is TemplateBlock.Text -> {
-                val div = parent.appendElement("div").addClass("text-block")
-                applyBlockStyle(div, block.settings)
-                div.appendElement("p").text(block.text)
-            }
+            is TemplateBlock.Text -> appendTextTemplateBlock(parent, block)
             is TemplateBlock.Date -> {
                 val div = parent.appendElement("div").addClass("date-block").text(todayIso)
                 applyBlockStyle(div, block.settings)
@@ -107,6 +103,18 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
                 block.blocks.forEach { appendTemplateBlock(div, it, todayIso, profile) }
             }
             is TemplateBlock.Html -> appendHtmlBlock(parent, block)
+        }
+    }
+
+    private fun appendTextTemplateBlock(parent: org.jsoup.nodes.Element, block: TemplateBlock.Text) {
+        val div = parent.appendElement("div")
+            .addClass("text-block")
+            .attr("data-template-block-id", block.id)
+        applyBlockStyle(div, block.settings)
+        val paragraph = div.appendElement("p").text(block.text)
+        if (block.settings.editable == true) {
+            paragraph.attr("contenteditable", "true")
+                .attr("data-field", "text_${block.id}")
         }
     }
 
@@ -320,11 +328,7 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
     private fun appendSafetyExtraTemplateBlocks(parent: org.jsoup.nodes.Element, content: TemplateContent, todayIso: String, profile: UserProfile?) {
         content.blocks.filterNot { it is TemplateBlock.Date }.forEach { block ->
             when (block) {
-                is TemplateBlock.Text -> {
-                    val div = parent.appendElement("div").addClass("text-block")
-                    applyBlockStyle(div, block.settings)
-                    div.appendElement("p").text(block.text)
-                }
+                is TemplateBlock.Text -> appendTextTemplateBlock(parent, block)
                 is TemplateBlock.Table -> appendEditableTable(parent, block)
                 is TemplateBlock.Signature -> appendSignature(parent, profile)
                 is TemplateBlock.Stamp -> appendStamp(parent, profile)

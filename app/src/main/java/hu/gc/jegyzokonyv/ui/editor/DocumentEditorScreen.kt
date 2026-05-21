@@ -88,8 +88,6 @@ fun DocumentEditorScreen(
     val snackbarScope = rememberCoroutineScope()
 
     var showAddText by remember { mutableStateOf(false) }
-    var showCaption by remember { mutableStateOf(false) }
-    var pendingPhotoPath by remember { mutableStateOf<String?>(null) }
     var showRename by remember { mutableStateOf(false) }
     var showDelete by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
@@ -167,11 +165,8 @@ fun DocumentEditorScreen(
             savedStateHandle.remove<String>(Routes.RESULT_KEY_IMAGE_PATH)
             if (isSafetyWalkthrough) {
                 scrollToBottomToken += 1
-                viewModel.onPhotoCaptured(pending, null)
-            } else {
-                pendingPhotoPath = pending
-                showCaption = true
             }
+            viewModel.onPhotoCaptured(pending, null)
         }
     }
 
@@ -292,25 +287,6 @@ fun DocumentEditorScreen(
             onConfirm = {
                 showAddText = false
                 viewModel.onAddText(it)
-            },
-        )
-    }
-
-    if (showCaption) {
-        val photo = pendingPhotoPath
-        AddTextDialog(
-            title = stringResource(R.string.dialog_caption_title),
-            label = stringResource(R.string.dialog_caption_hint),
-            confirmLabel = stringResource(R.string.action_save),
-            onDismiss = {
-                showCaption = false
-                if (photo != null) viewModel.onPhotoCaptured(photo, null)
-                pendingPhotoPath = null
-            },
-            onConfirm = { caption ->
-                showCaption = false
-                if (photo != null) viewModel.onPhotoCaptured(photo, caption)
-                pendingPhotoPath = null
             },
         )
     }

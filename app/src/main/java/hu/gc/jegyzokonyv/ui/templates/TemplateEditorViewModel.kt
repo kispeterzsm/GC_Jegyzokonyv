@@ -551,16 +551,46 @@ class TemplateEditorViewModel @Inject constructor(
         val htmlBlocks = doc.select(".html-block[data-template-block-id]").associate { block ->
             block.attr("data-template-block-id") to block.html()
         }
-        if (tables.isEmpty() && htmlBlocks.isEmpty()) return
+        val textBlocks = doc.select(".text-block[data-template-block-id]")
+            .filter { it.selectFirst("[contenteditable=true]") != null }
+            .associate { block -> block.attr("data-template-block-id") to block.wholeText().trim() }
+        if (tables.isEmpty() && htmlBlocks.isEmpty() && textBlocks.isEmpty()) return
         _state.update { s ->
-            s.copy(blocks = s.blocks.map { block ->
-                when {
-                    block is TemplateBlock.Table && tables.containsKey(block.id) -> block.copy(cells = tables.getValue(block.id))
-                    block is TemplateBlock.Html && htmlBlocks.containsKey(block.id) -> block.copy(html = htmlBlocks.getValue(block.id))
-                    else -> block
-                }
-            })
+            val updatedBlocks = s.blocks.map { block -> block.withPreviewValues(tables, htmlBlocks, textBlocks) }
+            if (updatedBlocks == s.blocks) s else s.copy(blocks = updatedBlocks)
         }
+    }
+
+    private fun TemplateBlock.withPreviewValues(
+        tables: Map<String, List<List<String>>>,
+        htmlBlocks: Map<String, String>,
+        textBlocks: Map<String, String>,
+    ): TemplateBlock = when {
+        this is TemplateBlock.Table && tables.containsKey(id) -> {
+            val newCells = tables.getValue(id)
+            if (newCells == cells) this else copy(cells = newCells)
+        }
+        this is TemplateBlock.Html && htmlBlocks.containsKey(id) -> {
+            val newHtml = htmlBlocks.getValue(id)
+            if (newHtml == html) this else copy(html = newHtml)
+        }
+        this is TemplateBlock.Text && textBlocks.containsKey(id) -> {
+            val newText = textBlocks.getValue(id)
+            if (newText == text) this else copy(text = newText)
+        }
+        this is TemplateBlock.Header -> {
+            val newBlocks = blocks.map { it.withPreviewValues(tables, htmlBlocks, textBlocks) }
+            if (newBlocks == blocks) this else copy(blocks = newBlocks)
+        }
+        this is TemplateBlock.Footer -> {
+            val newBlocks = blocks.map { it.withPreviewValues(tables, htmlBlocks, textBlocks) }
+            if (newBlocks == blocks) this else copy(blocks = newBlocks)
+        }
+        this is TemplateBlock.Images -> {
+            val newBlocks = blocks.map { it.withPreviewValues(tables, htmlBlocks, textBlocks) }
+            if (newBlocks == blocks) this else copy(blocks = newBlocks)
+        }
+        else -> this
     }
 
     fun save(fallbackName: String, onSaved: (String) -> Unit) {
