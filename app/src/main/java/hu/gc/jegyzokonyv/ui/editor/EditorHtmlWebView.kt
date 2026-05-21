@@ -103,7 +103,8 @@ private class EditorBridge(
 private fun injectEditBridge(html: String): String {
     val hasEditableContent = html.contains("contenteditable=\"true\"")
     val hasToggleChecks = html.contains("data-toggle-check=\"true\"")
-    if (!hasEditableContent && !hasToggleChecks) return html
+    val hasImagePreviews = html.contains("data-editor-image-preview=\"true\"")
+    if (!hasEditableContent && !hasToggleChecks && !hasImagePreviews) return html
     val cleanHtml = html
         .replace(Regex("""(?s)<script data-editor-bridge="true">.*?</script>"""), "")
         .replace(Regex("""(?s)<style data-editor-runtime="true">.*?</style>"""), "")
@@ -128,8 +129,21 @@ private fun injectEditBridge(html: String): String {
               border: 1px solid #000 !important;
               background: #f3f3f3 !important;
             }
-            body.safety-walkthrough .observation-image-preview {
+            .editor-image-preview {
               display: block !important;
+              width: 100%;
+              min-height: 180px !important;
+              height: 42vh !important;
+              max-height: 520px !important;
+              background-size: contain !important;
+              background-repeat: no-repeat !important;
+              background-position: center !important;
+            }
+            .photo-block .editor-image-preview {
+              width: 100% !important;
+              border-radius: 6px;
+            }
+            body.safety-walkthrough .observation-image-preview {
               width: 100% !important;
               height: 26vh !important;
               min-height: 140px !important;
@@ -137,9 +151,6 @@ private fun injectEditBridge(html: String): String {
               margin: 0 auto 6px !important;
               border: 1px solid #000 !important;
               background-color: #f3f3f3 !important;
-              background-size: contain !important;
-              background-repeat: no-repeat !important;
-              background-position: center !important;
             }
             body.safety-walkthrough .observation-table { font-size: 12px !important; }
             body.safety-walkthrough .observation-table th { width: 25% !important; }
@@ -170,6 +181,8 @@ private fun injectEditBridge(html: String): String {
                 img.setAttribute('src', preview.getAttribute('data-relative-src'));
                 var classes = preview.getAttribute('data-original-class');
                 if (classes) img.setAttribute('class', classes);
+                var style = preview.getAttribute('data-original-style');
+                if (style) img.setAttribute('style', style);
                 preview.parentNode.replaceChild(img, preview);
               });
               window.$BRIDGE_NAME.save(clone.outerHTML);
@@ -289,12 +302,21 @@ private fun embedDraftImages(html: String, draftDir: File): String {
             ?.groupValues
             ?.get(1)
             .orEmpty()
-        val className = originalClass.ifBlank { "observation-image" }
-        if (className.split(Regex("\\s+")).contains("observation-image")) {
-            return@replace """<div class="observation-image-preview" style="background-image:url($dataUri)" data-editor-image-preview="true" data-relative-src="$src" data-original-class="$className"></div>"""
-        }
+        val originalStyle = Regex("""\bstyle="([^"]*)"""")
+            .find(match.value)
+            ?.groupValues
+            ?.get(1)
+            .orEmpty()
+        val previewClasses = buildList {
+            add("editor-image-preview")
+            if (originalClass.isBlank() || originalClass.split(Regex("\\s+")).contains("observation-image")) {
+                add("observation-image-preview")
+            }
+            if (originalClass.isNotBlank()) add(originalClass)
+        }.joinToString(" ")
+        val previewStyle = "background-image:url($dataUri)"
 
-        """<img class="$className" src="$dataUri" data-relative-src="$src">"""
+        """<div class="$previewClasses" style="$previewStyle" data-editor-image-preview="true" data-relative-src="$src" data-original-class="$originalClass" data-original-style="$originalStyle"></div>"""
     }
 }
 
