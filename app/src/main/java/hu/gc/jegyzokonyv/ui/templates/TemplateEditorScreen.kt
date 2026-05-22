@@ -189,6 +189,7 @@ fun TemplateEditorScreen(
                         onAddImageDate = viewModel::addImageDateBlock,
                         onAddImageTable = { showImageTableDialog = true },
                         onAddImagePageNumber = viewModel::addImagePageNumberBlock,
+                        onAddImageIndex = viewModel::addImageIndexBlock,
                         onAddChecklist = { showChecklistDialog = true },
                     )
                 }
@@ -329,6 +330,7 @@ private fun AddElementsSection(
     onAddImageDate: () -> Unit,
     onAddImageTable: () -> Unit,
     onAddImagePageNumber: () -> Unit,
+    onAddImageIndex: () -> Unit,
     onAddChecklist: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -425,6 +427,9 @@ private fun AddElementsSection(
                     AddElementButtonRow {
                         AddElementButton(text = "Táblázat fotóhoz", icon = Icons.Filled.GridOn, onClick = onAddImageTable, modifier = Modifier.weight(1f))
                         AddElementButton(text = "Oldalszám fotóhoz", icon = Icons.Filled.InsertPageBreak, onClick = onAddImagePageNumber, modifier = Modifier.weight(1f))
+                    }
+                    AddElementButtonRow {
+                        AddElementButton(text = "Kép sorszáma", icon = Icons.Filled.Draw, onClick = onAddImageIndex, modifier = Modifier.weight(1f))
                     }
                 }
             }
@@ -1187,6 +1192,7 @@ private fun SpecialCellElementDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SpecialElementButton("Oldalszám") { onInsert(PAGE_NUMBER_TOKEN) }
+                SpecialElementButton("Kép sorszáma") { onInsert(IMAGE_INDEX_TOKEN) }
                 SpecialElementButton("Dátum") { onInsert(DATE_TOKEN) }
                 SpecialElementButton("Profil név") { onInsert(PROFILE_NAME_TOKEN) }
                 SpecialElementButton("Profil cégnév") { onInsert(PROFILE_COMPANY_TOKEN) }
@@ -1362,6 +1368,7 @@ private fun ColorSlider(label: String, value: Int, onChange: (Int) -> Unit) {
 }
 
 private const val PAGE_NUMBER_TOKEN = "{{oldalszam}}"
+private const val IMAGE_INDEX_TOKEN = "{{kep_sorszam}}"
 private const val DATE_TOKEN = "{{datum}}"
 private const val PROFILE_NAME_TOKEN = "{{profil_nev}}"
 private const val PROFILE_COMPANY_TOKEN = "{{profil_cegnev}}"

@@ -249,11 +249,6 @@ class TemplateEditorViewModel @Inject constructor(
         addBlockAboveImages(TemplateBlock.PageBreak(id = UUID.randomUUID().toString()))
     }
 
-    fun addHtmlBlock(html: String = DEFAULT_HTML_BLOCK) {
-        if (_state.value.isReadOnly) return
-        addBlockAboveImages(TemplateBlock.Html(id = UUID.randomUUID().toString(), html = html))
-    }
-
     fun addHeaderBlock() {
         if (_state.value.isReadOnly) return
         _state.update { s -> if (s.blocks.any { it is TemplateBlock.Header }) s else s.copy(blocks = normalizeLockedBlocks(s.blocks + TemplateBlock.Header(id = UUID.randomUUID().toString()))) }
@@ -278,6 +273,7 @@ class TemplateEditorViewModel @Inject constructor(
     fun addImageDateBlock() = addBlockToImages(TemplateBlock.Date(id = UUID.randomUUID().toString()))
     fun addImageTableBlock(rows: Int, columns: Int, hasHeaderColumn: Boolean) = addBlockToImages(newTableBlock(rows, columns, hasHeaderColumn))
     fun addImagePageNumberBlock() = addBlockToImages(TemplateBlock.PageNumber(id = UUID.randomUUID().toString()))
+    fun addImageIndexBlock() = addBlockToImages(TemplateBlock.Text(id = UUID.randomUUID().toString(), text = IMAGE_INDEX_TOKEN))
 
     fun addCheckTableBlock(rows: Int, columns: Int, tickColumnFirst: Boolean) {
         if (_state.value.isReadOnly) return
@@ -661,7 +657,7 @@ class TemplateEditorViewModel @Inject constructor(
     }
     private companion object {
         const val IMAGES_BLOCK_ID = "template-images"
-        const val DEFAULT_HTML_BLOCK = "<p contenteditable=\"true\">Szerkeszthető HTML szöveg</p>"
+        const val IMAGE_INDEX_TOKEN = "{{kep_sorszam}}"
     }
 }
 

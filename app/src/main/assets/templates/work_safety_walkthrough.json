@@ -1,8 +1,1894 @@
 {
-  "title": "Munkavédelmi bejárás",
-  "kind": "safety_walkthrough",
+  "title": "",
+  "kind": "standard",
   "version": 1,
   "blocks": [
-    { "id": "builtin-work-safety-date", "type": "date" }
+    {
+      "id": "builtin-work-safety-header",
+      "type": "table",
+      "rows": 1,
+      "columns": 3,
+      "hasHeaderColumn": false,
+      "cells": [
+        [
+          "Építkezés neve",
+          "MUNKAVÉDELMI BEJÁRÁS\nELLENŐRZÉSI jegyzőkönyv",
+          "7/B melléklet"
+        ]
+      ],
+      "cellSettings": [
+        [
+          {
+            "backgroundColor": "#e9e9e9",
+            "textAlign": "center",
+            "editable": false,
+            "bold": true
+          },
+          {
+            "backgroundColor": "#e9e9e9",
+            "textAlign": "center",
+            "editable": false,
+            "bold": true
+          },
+          {
+            "backgroundColor": "#e9e9e9",
+            "textAlign": "center",
+            "editable": false,
+            "bold": true
+          }
+        ]
+      ]
+    },
+    {
+      "id": "builtin-work-safety-general",
+      "type": "text",
+      "text": "Generálkivitelező: {{profil_cegnev}}",
+      "settings": {
+        "bold": true
+      }
+    },
+    {
+      "id": "builtin-work-safety-inspector",
+      "type": "text",
+      "text": "Az ellenőrzést végezte: {{profil_nev}}    Dátum: {{datum_hu}}",
+      "settings": {
+        "bold": true
+      }
+    },
+    {
+      "id": "builtin-work-safety-legend",
+      "type": "text",
+      "text": "Megfelelt: ✓    Nem felelt meg: X"
+    },
+    {
+      "id": "builtin-work-safety-actions-title",
+      "type": "text",
+      "text": "Az együttműködés előmozdítása érdekében tett intézkedések",
+      "settings": {
+        "bold": true
+      }
+    },
+    {
+      "id": "builtin-work-safety-actions",
+      "type": "table",
+      "rows": 6,
+      "columns": 2,
+      "hasHeaderColumn": false,
+      "cells": [
+        [
+          "X",
+          "beléptetés megoldása"
+        ],
+        [
+          "X",
+          "generálkivitelező FMV a helyszínen"
+        ],
+        [
+          "X",
+          "BEK bejárás heti 1 alkalommal"
+        ],
+        [
+          "X",
+          "ellenőrzési tapasztalatok megküldése és a megelőzés számonkérése"
+        ],
+        [
+          "X",
+          "különböző munkáltatók tevékenységének összehangolása építésvezetői közreműködéssel"
+        ],
+        [
+          "X",
+          "napi tájékoztatók"
+        ]
+      ],
+      "cellSettings": [
+        [
+          {
+            "textAlign": "center",
+            "bold": true,
+            "toggleCheck": true,
+            "tickXBackgroundColor": "#ff0000",
+            "tickXTextColor": "#000000",
+            "tickCheckedBackgroundColor": "#92d050",
+            "tickCheckedTextColor": "#000000"
+          },
+          {
+            "editable": false
+          }
+        ],
+        [
+          {
+            "textAlign": "center",
+            "bold": true,
+            "toggleCheck": true,
+            "tickXBackgroundColor": "#ff0000",
+            "tickXTextColor": "#000000",
+            "tickCheckedBackgroundColor": "#92d050",
+            "tickCheckedTextColor": "#000000"
+          },
+          {
+            "editable": false
+          }
+        ],
+        [
+          {
+            "textAlign": "center",
+            "bold": true,
+            "toggleCheck": true,
+            "tickXBackgroundColor": "#ff0000",
+            "tickXTextColor": "#000000",
+            "tickCheckedBackgroundColor": "#92d050",
+            "tickCheckedTextColor": "#000000"
+          },
+          {
+            "editable": false
+          }
+        ],
+        [
+          {
+            "textAlign": "center",
+            "bold": true,
+            "toggleCheck": true,
+            "tickXBackgroundColor": "#ff0000",
+            "tickXTextColor": "#000000",
+            "tickCheckedBackgroundColor": "#92d050",
+            "tickCheckedTextColor": "#000000"
+          },
+          {
+            "editable": false
+          }
+        ],
+        [
+          {
+            "textAlign": "center",
+            "bold": true,
+            "toggleCheck": true,
+            "tickXBackgroundColor": "#ff0000",
+            "tickXTextColor": "#000000",
+            "tickCheckedBackgroundColor": "#92d050",
+            "tickCheckedTextColor": "#000000"
+          },
+          {
+            "editable": false
+          }
+        ],
+        [
+          {
+            "textAlign": "center",
+            "bold": true,
+            "toggleCheck": true,
+            "tickXBackgroundColor": "#ff0000",
+            "tickXTextColor": "#000000",
+            "tickCheckedBackgroundColor": "#92d050",
+            "tickCheckedTextColor": "#000000"
+          },
+          {
+            "editable": false
+          }
+        ]
+      ]
+    },
+    {
+      "id": "builtin-work-safety-status",
+      "type": "text",
+      "text": "Munkaterület állapota a mai napon",
+      "settings": {
+        "bold": true
+      }
+    },
+    {
+      "id": "builtin-work-safety-risk-intro",
+      "type": "text",
+      "text": "Értékelés módja kockázat alapú:"
+    },
+    {
+      "id": "builtin-work-safety-risk-matrix",
+      "type": "table",
+      "rows": 6,
+      "columns": 6,
+      "hasHeaderColumn": false,
+      "cells": [
+        [
+          "következmény\n\nvalószínűség",
+          "nincs hatás,\nvagy a hatás\njelentéktelen",
+          "könnyebb\nsérülést okoz",
+          "jelentős\nsérülést okoz",
+          "súlyos sérülést\nokoz",
+          "fokozottan\nsúlyos vagy\nhalálos\nkimenetelű"
+        ],
+        [
+          "valószínűtlen",
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+        ],
+        [
+          "inkább nem\nfordul elő",
+          "2",
+          "4",
+          "6",
+          "8",
+          "10"
+        ],
+        [
+          "lehetséges",
+          "3",
+          "6",
+          "9",
+          "12",
+          "15"
+        ],
+        [
+          "valószínűleg\nelőfordul",
+          "4",
+          "8",
+          "12",
+          "16",
+          "20"
+        ],
+        [
+          "elkerülhetetlen",
+          "5",
+          "10",
+          "15",
+          "20",
+          "25"
+        ]
+      ],
+      "cellSettings": [
+        [
+          {
+            "editable": false
+          },
+          {
+            "textAlign": "center",
+            "editable": false
+          },
+          {
+            "textAlign": "center",
+            "editable": false
+          },
+          {
+            "textAlign": "center",
+            "editable": false
+          },
+          {
+            "textAlign": "center",
+            "editable": false
+          },
+          {
+            "textAlign": "center",
+            "editable": false
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "backgroundColor": "#92d050",
+            "textAlign": "center",
+            "editable": false
+          },
+          {
+            "backgroundColor": "#92d050",
+            "textAlign": "center",
+            "editable": false
+          },
+          {
+            "backgroundColor": "#92d050",
+            "textAlign": "center",
+            "editable": false
+          },
+          {
+            "backgroundColor": "#92d050",
+            "textAlign": "center",
+            "editable": false
+          },
+          {
+            "backgroundColor": "#ffff00",
+            "textAlign": "center",
+            "editable": false
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "backgroundColor": "#92d050",
+            "textAlign": "center",
+            "editable": false
+          },
+          {
+            "backgroundColor": "#92d050",
+            "textAlign": "center",
+            "editable": false
+          },
+          {
+            "backgroundColor": "#ffff00",
+            "textAlign": "center",
+            "editable": false
+          },
+          {
+            "backgroundColor": "#ffff00",
+            "textAlign": "center",
+            "editable": false
+          },
+          {
+            "backgroundColor": "#ffff00",
+            "textAlign": "center",
+            "editable": false
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "backgroundColor": "#92d050",
+            "textAlign": "center",
+            "editable": false
+          },
+          {
+            "backgroundColor": "#ffff00",
+            "textAlign": "center",
+            "editable": false
+          },
+          {
+            "backgroundColor": "#ffff00",
+            "textAlign": "center",
+            "editable": false
+          },
+          {
+            "backgroundColor": "#ff0000",
+            "textAlign": "center",
+            "editable": false
+          },
+          {
+            "backgroundColor": "#ff0000",
+            "textAlign": "center",
+            "editable": false
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "backgroundColor": "#92d050",
+            "textAlign": "center",
+            "editable": false
+          },
+          {
+            "backgroundColor": "#ffff00",
+            "textAlign": "center",
+            "editable": false
+          },
+          {
+            "backgroundColor": "#ff0000",
+            "textAlign": "center",
+            "editable": false
+          },
+          {
+            "backgroundColor": "#ff0000",
+            "textAlign": "center",
+            "editable": false
+          },
+          {
+            "backgroundColor": "#ff0000",
+            "textAlign": "center",
+            "editable": false
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "backgroundColor": "#ffff00",
+            "textAlign": "center",
+            "editable": false
+          },
+          {
+            "backgroundColor": "#ffff00",
+            "textAlign": "center",
+            "editable": false
+          },
+          {
+            "backgroundColor": "#ff0000",
+            "textAlign": "center",
+            "editable": false
+          },
+          {
+            "backgroundColor": "#ff0000",
+            "textAlign": "center",
+            "editable": false
+          },
+          {
+            "backgroundColor": "#ff0000",
+            "textAlign": "center",
+            "editable": false
+          }
+        ]
+      ]
+    },
+    {
+      "id": "builtin-work-safety-risk-levels",
+      "type": "table",
+      "rows": 4,
+      "columns": 3,
+      "hasHeaderColumn": false,
+      "cells": [
+        [
+          "kockázati szint",
+          "végrehajtási határidő",
+          ""
+        ],
+        [
+          "magas",
+          "azonnali",
+          "intézkedésig munka nem végezhető"
+        ],
+        [
+          "közepes",
+          "rövid határidő",
+          "intézkedésig 1-3 nap türelmi idő engedélyezett, addig munka csak feltételekkel végezhető"
+        ],
+        [
+          "alacsony",
+          "hosszabb határidő",
+          "a munkavégzés megengedett, intézkedni a következő bejárás, karbantartás, javítás alkalmáig kell (1 hét)"
+        ]
+      ],
+      "cellSettings": [
+        [
+          {
+            "backgroundColor": "#e9e9e9",
+            "editable": false,
+            "bold": true
+          },
+          {
+            "backgroundColor": "#e9e9e9",
+            "editable": false,
+            "bold": true
+          },
+          {
+            "backgroundColor": "#e9e9e9",
+            "editable": false,
+            "bold": true
+          }
+        ],
+        [
+          {
+            "backgroundColor": "#ff0000",
+            "editable": false
+          },
+          {
+            "editable": false
+          },
+          {
+            "editable": false
+          }
+        ],
+        [
+          {
+            "backgroundColor": "#ffff00",
+            "editable": false
+          },
+          {
+            "editable": false
+          },
+          {
+            "editable": false
+          }
+        ],
+        [
+          {
+            "backgroundColor": "#92d050",
+            "editable": false
+          },
+          {
+            "editable": false
+          },
+          {
+            "editable": false
+          }
+        ]
+      ]
+    },
+    {
+      "id": "builtin-work-safety-after-risk",
+      "type": "page_break"
+    },
+    {
+      "id": "builtin-work-safety-checklist-header-1",
+      "type": "table",
+      "rows": 1,
+      "columns": 3,
+      "hasHeaderColumn": false,
+      "cells": [
+        [
+          "Építkezés neve",
+          "MUNKAVÉDELMI BEJÁRÁS\nELLENŐRZÉSI jegyzőkönyv",
+          "7/B melléklet"
+        ]
+      ],
+      "cellSettings": [
+        [
+          {
+            "backgroundColor": "#e9e9e9",
+            "textAlign": "center",
+            "editable": false,
+            "bold": true
+          },
+          {
+            "backgroundColor": "#e9e9e9",
+            "textAlign": "center",
+            "editable": false,
+            "bold": true
+          },
+          {
+            "backgroundColor": "#e9e9e9",
+            "textAlign": "center",
+            "editable": false,
+            "bold": true
+          }
+        ]
+      ]
+    },
+    {
+      "id": "builtin-work-safety-checklist-documentation",
+      "type": "table",
+      "rows": 32,
+      "columns": 2,
+      "hasHeaderColumn": false,
+      "cells": [
+        [
+          "Dokumentációk megléte",
+          ""
+        ],
+        [
+          "kockázatértékelés",
+          ""
+        ],
+        [
+          "engedély",
+          ""
+        ],
+        [
+          "    hegesztés, nyílt láng, szikra",
+          ""
+        ],
+        [
+          "    földmunka",
+          ""
+        ],
+        [
+          "    szűk-zárt tér",
+          ""
+        ],
+        [
+          "    visszabontás",
+          ""
+        ],
+        [
+          "Biztonsági terv: ",
+          ""
+        ],
+        [
+          "    munkagödör omlásbiztosítása",
+          ""
+        ],
+        [
+          "    szűk-zárt térben való munkavégzés",
+          ""
+        ],
+        [
+          "    épületszerkezet visszabontása",
+          ""
+        ],
+        [
+          "    zsaluzatok bontása",
+          ""
+        ],
+        [
+          "    több emelőgéppel végzett együttes emelés",
+          ""
+        ],
+        [
+          "munkavédelmi üzembe helyezés",
+          ""
+        ],
+        [
+          "    veszélyes munkaeszköz",
+          ""
+        ],
+        [
+          "    emelőgép",
+          ""
+        ],
+        [
+          "    alpin-technika",
+          ""
+        ],
+        [
+          "    használatba vételi eljárás",
+          ""
+        ],
+        [
+          "    ideiglenes energiaelosztó hálózat",
+          ""
+        ],
+        [
+          "    össze- és szétszerelhető munkaeszközök",
+          ""
+        ],
+        [
+          "    állvány",
+          ""
+        ],
+        [
+          "felülvizsgálatok",
+          ""
+        ],
+        [
+          "elektromos kéziszerszám szerelői ellenőrzése",
+          ""
+        ],
+        [
+          "ÁVK havonta",
+          ""
+        ],
+        [
+          "tűzoltó készülék üzemeltetési napló",
+          ""
+        ],
+        [
+          "homlokzati állványzat, akna állványzata",
+          ""
+        ],
+        [
+          "mobil állvány",
+          ""
+        ],
+        [
+          "létra",
+          ""
+        ],
+        [
+          "egyéb ideiglenes felépítmények",
+          ""
+        ],
+        [
+          "nyilvántartások: EVE átvétel, területre vonatkozó oktatási napló, veszélyes anyagok",
+          ""
+        ],
+        [
+          "emelő- és munkagépek gépnaplója, felülvizsgálati jegyzőkönyvek",
+          ""
+        ],
+        [
+          "technológiai utasítás",
+          ""
+        ]
+      ],
+      "cellSettings": [
+        [
+          {
+            "backgroundColor": "#e9e9e9",
+            "editable": false,
+            "bold": true,
+            "mergeRight": true
+          },
+          {
+            "backgroundColor": "#e9e9e9",
+            "editable": false,
+            "bold": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "backgroundColor": "#e9e9e9",
+            "editable": false,
+            "mergeRight": true
+          },
+          {
+            "editable": false
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "backgroundColor": "#e9e9e9",
+            "editable": false,
+            "mergeRight": true
+          },
+          {
+            "editable": false
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "backgroundColor": "#e9e9e9",
+            "editable": false,
+            "mergeRight": true
+          },
+          {
+            "editable": false
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ]
+      ],
+      "rowSettings": [
+        {},
+        {
+          "hideIfEmpty": true
+        },
+        {},
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {},
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {},
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        }
+      ]
+    },
+    {
+      "id": "builtin-work-safety-checklist-personnel",
+      "type": "table",
+      "rows": 16,
+      "columns": 2,
+      "hasHeaderColumn": false,
+      "cells": [
+        [
+          "Személyi feltételek ellenőrzése",
+          ""
+        ],
+        [
+          "képzettség (bizonyítvány, igazolvány, jogosítvány, tűzvédelmi szakvizsga)",
+          ""
+        ],
+        [
+          "orvosi alkalmasság",
+          ""
+        ],
+        [
+          "fizikai, gyakorlati alkalmasság, megfelelő létszám",
+          ""
+        ],
+        [
+          "kockázatok ismerete, oktatás a megelőzésről",
+          ""
+        ],
+        [
+          "soron kívüli oktatás",
+          ""
+        ],
+        [
+          "    állvány építése és bontása",
+          ""
+        ],
+        [
+          "    személyek emelésére alkalmas emelőgép használata",
+          ""
+        ],
+        [
+          "    zuhanásgátló heveder alkalmazása",
+          ""
+        ],
+        [
+          "    emelőgép kezelése",
+          ""
+        ],
+        [
+          "    daruirányítás, teherkötözés",
+          ""
+        ],
+        [
+          "    hegesztés fokozottan veszélyes körülmények között",
+          ""
+        ],
+        [
+          "    technológiai művelet",
+          ""
+        ],
+        [
+          "    ideiglenes munkairányítás",
+          ""
+        ],
+        [
+          "    szűk-zárt tér",
+          ""
+        ],
+        [
+          "munkairányító kinevezése",
+          ""
+        ]
+      ],
+      "cellSettings": [
+        [
+          {
+            "backgroundColor": "#e9e9e9",
+            "editable": false,
+            "bold": true,
+            "mergeRight": true
+          },
+          {
+            "backgroundColor": "#e9e9e9",
+            "editable": false,
+            "bold": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "backgroundColor": "#e9e9e9",
+            "editable": false,
+            "mergeRight": true
+          },
+          {
+            "editable": false
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ]
+      ],
+      "rowSettings": [
+        {},
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {},
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        }
+      ]
+    },
+    {
+      "id": "builtin-work-safety-checklist-header-2",
+      "type": "table",
+      "rows": 1,
+      "columns": 3,
+      "hasHeaderColumn": false,
+      "cells": [
+        [
+          "Építkezés neve",
+          "MUNKAVÉDELMI BEJÁRÁS\nELLENŐRZÉSI jegyzőkönyv",
+          "7/B melléklet"
+        ]
+      ],
+      "cellSettings": [
+        [
+          {
+            "backgroundColor": "#e9e9e9",
+            "textAlign": "center",
+            "editable": false,
+            "bold": true
+          },
+          {
+            "backgroundColor": "#e9e9e9",
+            "textAlign": "center",
+            "editable": false,
+            "bold": true
+          },
+          {
+            "backgroundColor": "#e9e9e9",
+            "textAlign": "center",
+            "editable": false,
+            "bold": true
+          }
+        ]
+      ]
+    },
+    {
+      "id": "builtin-work-safety-checklist-equipment",
+      "type": "table",
+      "rows": 9,
+      "columns": 2,
+      "hasHeaderColumn": false,
+      "cells": [
+        [
+          "Tárgyi feltételek",
+          ""
+        ],
+        [
+          "kollektív és megfelelő egyéni védőeszközök",
+          ""
+        ],
+        [
+          "ép szerszámok és eszközök",
+          ""
+        ],
+        [
+          "szabványos állványok és létrák, feljárók, átjárók állapota",
+          ""
+        ],
+        [
+          "dúcolatok",
+          ""
+        ],
+        [
+          "függesztékek állapota",
+          ""
+        ],
+        [
+          "elsősegély doboz a helyszínen",
+          ""
+        ],
+        [
+          "tűzoltó készülék",
+          ""
+        ],
+        [
+          "munkakörnyezeti tényezők: megvilágítás, fűtés, szellőzés, hozzáférés, villamos biztonság, közlekedés, veszélyes anyagok kezelése, zaj, rezgés, por, stabilitás",
+          ""
+        ]
+      ],
+      "cellSettings": [
+        [
+          {
+            "backgroundColor": "#e9e9e9",
+            "editable": false,
+            "bold": true,
+            "mergeRight": true
+          },
+          {
+            "backgroundColor": "#e9e9e9",
+            "editable": false,
+            "bold": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ]
+      ],
+      "rowSettings": [
+        {},
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        }
+      ]
+    },
+    {
+      "id": "builtin-work-safety-checklist-organization",
+      "type": "table",
+      "rows": 11,
+      "columns": 2,
+      "hasHeaderColumn": false,
+      "cells": [
+        [
+          "Szervezési feltételek",
+          ""
+        ],
+        [
+          "munkaterület átvétele, lehatárolása",
+          ""
+        ],
+        [
+          "közlekedési útvonal biztosítása",
+          ""
+        ],
+        [
+          "anyagmozgatás irányítása",
+          ""
+        ],
+        [
+          "rend, fegyelem, tisztaság",
+          ""
+        ],
+        [
+          "dohányzás",
+          ""
+        ],
+        [
+          "tűzvédelmi előírások betartása",
+          ""
+        ],
+        [
+          "konzultáció",
+          ""
+        ],
+        [
+          "védőital, pihenőidő",
+          ""
+        ],
+        [
+          "anyag és hulladéktárolás kialakítása",
+          ""
+        ],
+        [
+          "veszélyes anyagok, gázpalackok kezelése",
+          ""
+        ]
+      ],
+      "cellSettings": [
+        [
+          {
+            "backgroundColor": "#e9e9e9",
+            "editable": false,
+            "bold": true,
+            "mergeRight": true
+          },
+          {
+            "backgroundColor": "#e9e9e9",
+            "editable": false,
+            "bold": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ],
+        [
+          {
+            "editable": false
+          },
+          {
+            "editable": true
+          }
+        ]
+      ],
+      "rowSettings": [
+        {},
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        },
+        {
+          "hideIfEmpty": true
+        }
+      ]
+    },
+    {
+      "id": "builtin-work-safety-checklist-break-2",
+      "type": "page_break"
+    },
+    {
+      "id": "builtin-work-safety-signature",
+      "type": "signature"
+    },
+    {
+      "id": "builtin-work-safety-images",
+      "type": "images",
+      "blocks": [
+        {
+          "id": "builtin-work-safety-observation-header",
+          "type": "table",
+          "rows": 1,
+          "columns": 4,
+          "hasHeaderColumn": false,
+          "cells": [
+            [
+              "Építkezés neve",
+              "MUNKAVÉDELMI BEJÁRÁS\nELLENŐRZÉSI jegyzőkönyv",
+              "7/B melléklet",
+              "{{kep_sorszam}}."
+            ]
+          ],
+          "cellSettings": [
+            [
+              {
+                "backgroundColor": "#e9e9e9",
+                "textAlign": "center",
+                "editable": false,
+                "bold": true
+              },
+              {
+                "backgroundColor": "#e9e9e9",
+                "textAlign": "center",
+                "editable": false,
+                "bold": true
+              },
+              {
+                "backgroundColor": "#e9e9e9",
+                "textAlign": "center",
+                "editable": false,
+                "bold": true
+              },
+              {
+                "backgroundColor": "#e9e9e9",
+                "textAlign": "center",
+                "editable": false,
+                "bold": true
+              }
+            ]
+          ]
+        },
+        {
+          "id": "builtin-work-safety-observation-image",
+          "type": "image"
+        },
+        {
+          "id": "builtin-work-safety-observation-table",
+          "type": "table",
+          "rows": 8,
+          "columns": 3,
+          "hasHeaderColumn": true,
+          "cells": [
+            [
+              "kockázati szint",
+              "",
+              ""
+            ],
+            [
+              "veszély forrása",
+              "",
+              ""
+            ],
+            [
+              "veszélyhelyzet",
+              "",
+              ""
+            ],
+            [
+              "megelőzés",
+              "",
+              ""
+            ],
+            [
+              "határidő",
+              "",
+              ""
+            ],
+            [
+              "felelős",
+              "",
+              ""
+            ],
+            [
+              "szankció",
+              "",
+              ""
+            ],
+            [
+              "visszaellenőrzés",
+              "",
+              ""
+            ]
+          ],
+          "cellSettings": [
+            [
+              {
+                "editable": false,
+                "bold": true
+              },
+              {
+                "editable": true
+              },
+              {
+                "editable": true
+              }
+            ],
+            [
+              {
+                "editable": false,
+                "bold": true
+              },
+              {
+                "editable": true
+              },
+              {
+                "editable": true
+              }
+            ],
+            [
+              {
+                "editable": false,
+                "bold": true
+              },
+              {
+                "editable": true
+              },
+              {
+                "editable": true
+              }
+            ],
+            [
+              {
+                "editable": false,
+                "bold": true
+              },
+              {
+                "editable": true
+              },
+              {
+                "editable": true
+              }
+            ],
+            [
+              {
+                "editable": false,
+                "bold": true
+              },
+              {
+                "editable": true
+              },
+              {
+                "editable": true
+              }
+            ],
+            [
+              {
+                "editable": false,
+                "bold": true
+              },
+              {
+                "editable": true
+              },
+              {
+                "editable": true
+              }
+            ],
+            [
+              {
+                "editable": false,
+                "bold": true
+              },
+              {
+                "editable": true
+              },
+              {
+                "editable": true
+              }
+            ],
+            [
+              {
+                "editable": false,
+                "bold": true
+              },
+              {
+                "editable": true
+              },
+              {
+                "editable": true
+              }
+            ]
+          ]
+        },
+        {
+          "id": "builtin-work-safety-observation-break",
+          "type": "page_break"
+        }
+      ]
+    }
   ]
 }

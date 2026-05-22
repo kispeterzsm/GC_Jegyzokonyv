@@ -1,8 +1,30 @@
 {
   "title": "Helyszíni szemle",
+  "kind": "standard",
   "version": 1,
   "blocks": [
-    { "id": "builtin-inspection-text", "type": "text", "text": "Helyszíni szemle jegyzőkönyve" },
-    { "id": "builtin-inspection-date", "type": "date" }
+    {
+      "id": "builtin-inspection-title",
+      "type": "text",
+      "text": "Helyszíni szemle jegyzőkönyve",
+      "settings": {
+        "bold": true,
+        "textAlign": "center"
+      }
+    },
+    {
+      "id": "builtin-inspection-date",
+      "type": "date"
+    },
+    {
+      "id": "builtin-inspection-images",
+      "type": "images",
+      "blocks": [
+        {
+          "id": "builtin-inspection-image",
+          "type": "image"
+        }
+      ]
+    }
   ]
 }
