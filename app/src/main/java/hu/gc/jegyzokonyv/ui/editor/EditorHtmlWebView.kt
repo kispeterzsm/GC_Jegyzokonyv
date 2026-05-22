@@ -12,9 +12,13 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.util.Base64
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import org.json.JSONObject
 import java.io.File
 import java.io.FileInputStream
@@ -32,6 +36,20 @@ fun EditorHtmlWebView(
 ) {
     val bridge = remember(onHtmlChanged, onEditableCellFocusedChanged) {
         EditorBridge(onHtmlChanged, onEditableCellFocusedChanged)
+    }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val webViewHolder = remember { arrayOfNulls<WebView>(1) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE || event == Lifecycle.Event.ON_STOP) {
+                webViewHolder[0]?.requestEditorSave()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            webViewHolder[0]?.requestEditorSave()
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
     AndroidView(
         modifier = modifier,
@@ -53,6 +71,7 @@ fun EditorHtmlWebView(
             }
         },
         update = { view ->
+            webViewHolder[0] = view
             (view.webViewClient as? DraftFileWebViewClient)?.draftDir = draftDir
             val htmlChanged = view.getTag(LOADED_HTML_TAG) != html
             val lastScrollToken = view.getTag(SCROLL_TO_BOTTOM_TOKEN_TAG) as? Int
@@ -170,11 +189,10 @@ private fun injectEditBridge(html: String): String {
     val script = """
         <script data-editor-bridge="true">
         (function() {
-          var timer = null;
           var activeEditable = null;
           var savedRange = null;
+          var lastSavedHtml = null;
           function saveNow() {
-            timer = null;
             if (window.$BRIDGE_NAME && window.$BRIDGE_NAME.save) {
               var clone = document.documentElement.cloneNode(true);
               clone.querySelectorAll('script[data-editor-bridge="true"]').forEach(function(node) {
@@ -193,7 +211,10 @@ private fun injectEditBridge(html: String): String {
                 if (style) img.setAttribute('style', style);
                 preview.parentNode.replaceChild(img, preview);
               });
-              window.$BRIDGE_NAME.save(clone.outerHTML);
+              var serialized = clone.outerHTML;
+              if (serialized === lastSavedHtml) return;
+              lastSavedHtml = serialized;
+              window.$BRIDGE_NAME.save(serialized);
             }
           }
           function notifyFocus(focused) {
@@ -256,7 +277,8 @@ private fun injectEditBridge(html: String): String {
             return true;
           }
           window.EditorCommands = {
-            insertText: insertText
+            insertText: insertText,
+            save: saveNow
           };
           document.querySelectorAll('[data-toggle-check="true"]').forEach(applyCheckStyle);
           document.addEventListener('click', function(event) {
@@ -271,8 +293,7 @@ private fun injectEditBridge(html: String): String {
             if (!event.target || !event.target.isContentEditable) return;
             activeEditable = event.target;
             storeSelection();
-            if (timer) window.clearTimeout(timer);
-            timer = window.setTimeout(saveNow, 350);
+            saveNow();
           }, true);
           document.addEventListener('focusin', function(event) {
             if (!event.target || !event.target.isContentEditable) return;
@@ -285,10 +306,15 @@ private fun injectEditBridge(html: String): String {
           document.addEventListener('focusout', function(event) {
             if (!event.target || !event.target.isContentEditable) return;
             storeSelection();
-            if (timer) window.clearTimeout(timer);
             saveNow();
             notifyEditableFocusAfterBlur();
           }, true);
+          document.addEventListener('compositionend', saveNow, true);
+          document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState !== 'visible') saveNow();
+          }, true);
+          window.addEventListener('pagehide', saveNow, true);
+          window.addEventListener('beforeunload', saveNow, true);
         })();
         </script>
     """.trimIndent()
@@ -464,6 +490,13 @@ private class DraftFileWebViewClient(
             WebResourceResponse(mimeType, null, FileInputStream(requested))
         }.getOrNull()
     }
+}
+
+private fun WebView.requestEditorSave() {
+    evaluateJavascript(
+        "window.EditorCommands && window.EditorCommands.save && window.EditorCommands.save();",
+        null,
+    )
 }
 
 private fun WebView.scrollDocumentToBottom() {

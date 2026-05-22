@@ -60,7 +60,7 @@ class DraftRepositoryImpl @Inject constructor(
 
             fileStorage.draftDir(id)
             fileStorage.imagesDir(id)
-            fileStorage.documentHtml(id).writeText(initial, Charsets.UTF_8)
+            fileStorage.documentHtml(id).writeTextAtomic(initial)
             writeMetadata(id, title, templateId, now, now)
 
             draftDao.upsert(
@@ -83,7 +83,7 @@ class DraftRepositoryImpl @Inject constructor(
 
     override suspend fun saveHtml(draftId: String, html: String) = withContext(io) {
         writeMutex.withLock {
-            fileStorage.documentHtml(draftId).writeText(html, Charsets.UTF_8)
+            fileStorage.documentHtml(draftId).writeTextAtomic(html)
             touch(draftId)
         }
     }
@@ -92,7 +92,7 @@ class DraftRepositoryImpl @Inject constructor(
         writeMutex.withLock {
             val current = readHtml(draftId)
             val updated = htmlEngine.setTitle(current, title)
-            fileStorage.documentHtml(draftId).writeText(updated, Charsets.UTF_8)
+            fileStorage.documentHtml(draftId).writeTextAtomic(updated)
             val entity = draftDao.getById(draftId) ?: return@withLock
             val now = System.currentTimeMillis()
             draftDao.update(entity.copy(title = title, updatedAt = now))
@@ -108,7 +108,7 @@ class DraftRepositoryImpl @Inject constructor(
         writeMutex.withLock {
             val current = readHtml(draftId)
             val updated = htmlEngine.appendPhotoBlock(current, relativeImagePath, caption)
-            fileStorage.documentHtml(draftId).writeText(updated, Charsets.UTF_8)
+            fileStorage.documentHtml(draftId).writeTextAtomic(updated)
             touch(draftId)
         }
     }
@@ -117,7 +117,7 @@ class DraftRepositoryImpl @Inject constructor(
         writeMutex.withLock {
             val current = readHtml(draftId)
             val updated = htmlEngine.appendTextBlock(current, text)
-            fileStorage.documentHtml(draftId).writeText(updated, Charsets.UTF_8)
+            fileStorage.documentHtml(draftId).writeTextAtomic(updated)
             touch(draftId)
         }
     }
@@ -165,7 +165,20 @@ class DraftRepositoryImpl @Inject constructor(
             put("updatedAt", updatedAt)
             put("version", 1)
         }
-        fileStorage.metadataJson(draftId).writeText(json.toString(2), Charsets.UTF_8)
+        fileStorage.metadataJson(draftId).writeTextAtomic(json.toString(2))
+    }
+
+    private fun File.writeTextAtomic(text: String) {
+        parentFile?.mkdirs()
+        val tmp = File(parentFile, "$name.tmp")
+        tmp.outputStream().use { output ->
+            output.write(text.toByteArray(Charsets.UTF_8))
+            output.fd.sync()
+        }
+        if (!tmp.renameTo(this)) {
+            tmp.copyTo(this, overwrite = true)
+            tmp.delete()
+        }
     }
 
     private fun buildDraftTitle(templateTitle: String, todayIso: String): String {

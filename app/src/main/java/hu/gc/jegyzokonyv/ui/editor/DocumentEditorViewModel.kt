@@ -16,8 +16,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 
 sealed interface EditorEvent {
@@ -46,20 +50,41 @@ class DocumentEditorViewModel @Inject constructor(
     private val _events = Channel<EditorEvent>(Channel.BUFFERED)
     val events = _events.receiveAsFlow()
 
+    private val saveMutex = Mutex()
+    @Volatile private var lastHtmlFromEditor: String = ""
+    @Volatile private var lastSavedHtml: String = ""
+    @Volatile private var pendingSaveJob: Job? = null
+    private val htmlRevision = AtomicLong(0)
+    private val savedRevision = AtomicLong(0)
+
     init {
         viewModelScope.launch {
-            _html.value = draftRepository.loadHtml(draftId)
+            val loaded = draftRepository.loadHtml(draftId)
+            _html.value = loaded
+            lastHtmlFromEditor = loaded
+            lastSavedHtml = loaded
+            savedRevision.set(htmlRevision.get())
         }
     }
 
     fun reloadHtml() {
-        viewModelScope.launch { _html.value = draftRepository.loadHtml(draftId) }
+        viewModelScope.launch {
+            flushEditorHtml()
+            val loaded = draftRepository.loadHtml(draftId)
+            _html.value = loaded
+            lastHtmlFromEditor = loaded
+            lastSavedHtml = loaded
+        }
     }
 
     fun onTitleChange(newTitle: String) {
         viewModelScope.launch {
+            flushEditorHtml()
             draftRepository.setTitle(draftId, newTitle)
-            _html.value = draftRepository.loadHtml(draftId)
+            val loaded = draftRepository.loadHtml(draftId)
+            _html.value = loaded
+            lastHtmlFromEditor = loaded
+            lastSavedHtml = loaded
         }
     }
 
@@ -67,22 +92,39 @@ class DocumentEditorViewModel @Inject constructor(
         if (text.isBlank()) return
         if (_html.value.contains("safety-walkthrough")) return
         viewModelScope.launch {
+            flushEditorHtml()
             draftRepository.appendTextBlock(draftId, text.trim())
-            _html.value = draftRepository.loadHtml(draftId)
+            val loaded = draftRepository.loadHtml(draftId)
+            _html.value = loaded
+            lastHtmlFromEditor = loaded
+            lastSavedHtml = loaded
         }
     }
 
     fun onDocumentHtmlChanged(html: String) {
         if (html.isBlank()) return
-        viewModelScope.launch {
-            draftRepository.saveHtml(draftId, html)
+        val revision = htmlRevision.incrementAndGet()
+        lastHtmlFromEditor = html
+        pendingSaveJob = viewModelScope.launch {
+            saveMutex.withLock {
+                if (revision < htmlRevision.get()) return@withLock
+                if (html != lastSavedHtml || revision > savedRevision.get()) {
+                    draftRepository.saveHtml(draftId, html)
+                    lastSavedHtml = html
+                    savedRevision.set(revision)
+                }
+            }
         }
     }
 
     fun onPhotoCaptured(relativePath: String, caption: String?) {
         viewModelScope.launch {
+            flushEditorHtml()
             draftRepository.appendPhotoBlock(draftId, relativePath, caption?.takeIf { it.isNotBlank() })
-            _html.value = draftRepository.loadHtml(draftId)
+            val loaded = draftRepository.loadHtml(draftId)
+            _html.value = loaded
+            lastHtmlFromEditor = loaded
+            lastSavedHtml = loaded
         }
     }
 
@@ -90,6 +132,7 @@ class DocumentEditorViewModel @Inject constructor(
         if (_isExporting.value) return
         _isExporting.value = true
         viewModelScope.launch {
+            flushEditorHtml()
             val result = runCatching { exportPdfUseCase(draftId) }
             _isExporting.value = false
             result
@@ -114,6 +157,29 @@ class DocumentEditorViewModel @Inject constructor(
     }
 
     fun draftFolder(): File = draftRepository.draftDir(draftId)
+
+    private suspend fun flushEditorHtml() {
+        pendingSaveJob?.join()
+        val latest = lastHtmlFromEditor
+        if (latest.isBlank()) return
+        saveMutex.withLock {
+            val revision = htmlRevision.get()
+            if (latest != lastSavedHtml || revision > savedRevision.get()) {
+                draftRepository.saveHtml(draftId, latest)
+                lastSavedHtml = latest
+                savedRevision.set(revision)
+            }
+        }
+    }
+
+    override fun onCleared() {
+        // ViewModel scopes are cancelled during clear; persist the latest editor snapshot first.
+        val latest = lastHtmlFromEditor
+        if (latest.isNotBlank() && (latest != lastSavedHtml || htmlRevision.get() > savedRevision.get())) {
+            runCatching { kotlinx.coroutines.runBlocking { draftRepository.saveHtml(draftId, latest) } }
+        }
+        super.onCleared()
+    }
 
     private companion object {
         const val TAG = "ExportPdf"
