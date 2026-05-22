@@ -533,6 +533,7 @@ private fun BlockRow(
     onMoveDown: () -> Unit,
     onRemove: () -> Unit,
 ) {
+    var textDialog by remember(block.id) { mutableStateOf<TemplateBlock.Text?>(null) }
     var styleDialog by remember(block.id) { mutableStateOf<TableCellSettings?>(null) }
     var styleConfirm by remember(block.id) { mutableStateOf<(TableCellSettings) -> Unit>({}) }
     var tableDialog by remember(block.id) { mutableStateOf(false) }
@@ -581,7 +582,7 @@ private fun BlockRow(
                 Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                 if (!readOnly) {
                     when (block) {
-                        is TemplateBlock.Text -> IconButton(onClick = { styleConfirm = onTextSettingsChange; styleDialog = block.settings }) { Icon(Icons.Filled.Settings, contentDescription = "Beállítások") }
+                        is TemplateBlock.Text -> IconButton(onClick = { textDialog = block }) { Icon(Icons.Filled.Settings, contentDescription = "Beállítások") }
                         is TemplateBlock.Date -> IconButton(onClick = { styleConfirm = onDateSettingsChange; styleDialog = block.settings }) { Icon(Icons.Filled.Settings, contentDescription = "Beállítások") }
                         is TemplateBlock.PageNumber -> IconButton(onClick = { styleConfirm = onPageNumberSettingsChange; styleDialog = block.settings }) { Icon(Icons.Filled.Settings, contentDescription = "Beállítások") }
                         is TemplateBlock.Table -> IconButton(onClick = { tableDialog = true }) { Icon(Icons.Filled.Settings, contentDescription = "Beállítások") }
@@ -591,12 +592,12 @@ private fun BlockRow(
             }
 
             when (block) {
-                is TemplateBlock.Text -> OutlinedTextField(
-                    value = block.text,
-                    onValueChange = onTextChange,
-                    label = { Text(stringResource(R.string.template_editor_text_block_label)) },
-                    enabled = !readOnly,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 96.dp),
+                is TemplateBlock.Text -> Text(
+                    text = block.text.ifBlank { "(üres szöveg)" },
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 is TemplateBlock.Header -> ContainerBlockLabel(
                     title = "Fejléc tartalma",
@@ -674,6 +675,22 @@ private fun BlockRow(
         }
     }
 
+    textDialog?.let { textBlock ->
+        TextBlockSettingsDialog(
+            text = textBlock.text,
+            settings = textBlock.settings,
+            onDismiss = { textDialog = null },
+            onDelete = {
+                textDialog = null
+                pendingDelete = onRemove
+            },
+            onConfirm = { newText, newSettings ->
+                textDialog = null
+                onTextChange(newText)
+                onTextSettingsChange(newSettings)
+            },
+        )
+    }
     styleDialog?.let { settings ->
         StyledBlockSettingsDialog(
             settings = settings,
@@ -997,8 +1014,12 @@ private fun AxisSettingsDialog(
                 ColorSettingButtons(
                     backgroundColor = draft.backgroundColor,
                     textColor = draft.textColor,
+                    bold = draft.bold,
+                    italic = draft.italic,
                     onBackgroundChange = { draft = draft.copy(backgroundColor = it) },
                     onTextColorChange = { draft = draft.copy(textColor = it) },
+                    onBoldChange = { draft = draft.copy(bold = it) },
+                    onItalicChange = { draft = draft.copy(italic = it) },
                 )
                 TextAlignPicker(value = draft.textAlign, onChange = { draft = draft.copy(textAlign = it) })
                 if (tickColorsEnabled) {
@@ -1099,8 +1120,12 @@ private fun CellSettingsDialog(
                 ColorSettingButtons(
                     backgroundColor = draft.backgroundColor,
                     textColor = draft.textColor,
+                    bold = draft.bold.takeIf { !draft.toggleCheck },
+                    italic = draft.italic.takeIf { !draft.toggleCheck },
                     onBackgroundChange = { draft = draft.copy(backgroundColor = it) },
                     onTextColorChange = { draft = draft.copy(textColor = it) },
+                    onBoldChange = { draft = draft.copy(bold = it) },
+                    onItalicChange = { draft = draft.copy(italic = it) },
                 )
                 if (!draft.toggleCheck) {
                     TextAlignPicker(value = draft.textAlign, onChange = { draft = draft.copy(textAlign = it) })
@@ -1240,8 +1265,12 @@ private fun ColorSettingButtons(
     textLabel: String = "Betűszín",
     emptyBackgroundText: String = "Nincs háttérszín",
     emptyTextColorText: String = "Alapértelmezett betűszín",
+    bold: Boolean? = null,
+    italic: Boolean? = null,
     onBackgroundChange: (String) -> Unit,
     onTextColorChange: (String) -> Unit,
+    onBoldChange: ((Boolean) -> Unit)? = null,
+    onItalicChange: ((Boolean) -> Unit)? = null,
 ) {
     var expanded by remember { mutableStateOf<ColorTarget?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1251,6 +1280,16 @@ private fun ColorSettingButtons(
             }
             OutlinedButton(onClick = { expanded = if (expanded == ColorTarget.Text) null else ColorTarget.Text }, modifier = Modifier.weight(1f)) {
                 ButtonText(textLabel)
+            }
+        }
+        if (bold != null && italic != null && onBoldChange != null && onItalicChange != null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = { onBoldChange(!bold) }, modifier = Modifier.weight(1f)) {
+                    ButtonText(if (bold) "✓ Félkövér" else "Félkövér")
+                }
+                OutlinedButton(onClick = { onItalicChange(!italic) }, modifier = Modifier.weight(1f)) {
+                    ButtonText(if (italic) "✓ Dőlt" else "Dőlt")
+                }
             }
         }
         when (expanded) {
@@ -1375,6 +1414,7 @@ private fun ContainerBlockLabel(
     onDeleteRow: (tableId: String, row: Int) -> Unit,
     onDeleteColumn: (tableId: String, column: Int) -> Unit,
 ) {
+    var textDialog by remember(title) { mutableStateOf<TemplateBlock.Text?>(null) }
     var styleDialog by remember(title) { mutableStateOf<Pair<String, TableCellSettings>?>(null) }
     var styleConfirm by remember(title) { mutableStateOf<(String, TableCellSettings) -> Unit>({ _, _ -> }) }
     var tableDialogId by remember(title) { mutableStateOf<String?>(null) }
@@ -1407,11 +1447,11 @@ private fun ContainerBlockLabel(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     if (block is TemplateBlock.Text) {
-                        OutlinedTextField(
-                            value = block.text,
-                            onValueChange = { onTextChange(block.id, it) },
-                            label = { Text(label) },
-                            enabled = !readOnly,
+                        Text(
+                            text = "• $label: " + block.text.ifBlank { "(üres)" },
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
                         )
                     } else {
@@ -1419,7 +1459,7 @@ private fun ContainerBlockLabel(
                     }
                     if (!readOnly) {
                         when (block) {
-                            is TemplateBlock.Text -> IconButton(onClick = { styleConfirm = onTextSettingsChange; styleDialog = block.id to block.settings }) { Icon(Icons.Filled.Settings, contentDescription = "Beállítások") }
+                            is TemplateBlock.Text -> IconButton(onClick = { textDialog = block }) { Icon(Icons.Filled.Settings, contentDescription = "Beállítások") }
                             is TemplateBlock.Date -> IconButton(onClick = { styleConfirm = onDateSettingsChange; styleDialog = block.id to block.settings }) { Icon(Icons.Filled.Settings, contentDescription = "Beállítások") }
                             is TemplateBlock.PageNumber -> IconButton(onClick = { styleConfirm = onPageNumberSettingsChange; styleDialog = block.id to block.settings }) { Icon(Icons.Filled.Settings, contentDescription = "Beállítások") }
                             is TemplateBlock.Table -> IconButton(onClick = { tableDialogId = block.id }) { Icon(Icons.Filled.Settings, contentDescription = "Beállítások") }
@@ -1435,6 +1475,22 @@ private fun ContainerBlockLabel(
                 }
             }
         }
+    }
+    textDialog?.let { textBlock ->
+        TextBlockSettingsDialog(
+            text = textBlock.text,
+            settings = textBlock.settings,
+            onDismiss = { textDialog = null },
+            onDelete = {
+                textDialog = null
+                pendingDelete = { onDeleteBlock(textBlock.id) }
+            },
+            onConfirm = { newText, newSettings ->
+                textDialog = null
+                onTextChange(textBlock.id, newText)
+                onTextSettingsChange(textBlock.id, newSettings)
+            },
+        )
     }
     styleDialog?.let { (blockId, settings) ->
         StyledBlockSettingsDialog(
@@ -1491,6 +1547,82 @@ private fun StyledSettingsButton(readOnly: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
+private fun TextBlockSettingsDialog(
+    text: String,
+    settings: TableCellSettings,
+    onDismiss: () -> Unit,
+    onDelete: () -> Unit,
+    onConfirm: (String, TableCellSettings) -> Unit,
+) {
+    var draftText by remember(text) { mutableStateOf(text) }
+    var draft by remember(settings) { mutableStateOf(settings) }
+    var showSpecialDialog by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Szöveg beállításai") },
+        text = {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 520.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    OutlinedTextField(
+                        value = draftText,
+                        onValueChange = { draftText = it },
+                        label = { Text(stringResource(R.string.template_editor_text_block_label)) },
+                        modifier = Modifier.weight(1f).heightIn(min = 96.dp),
+                    )
+                    OutlinedButton(onClick = { showSpecialDialog = true }) {
+                        ButtonText("Speciális")
+                    }
+                }
+                ColorSettingButtons(
+                    backgroundColor = draft.backgroundColor,
+                    textColor = draft.textColor,
+                    bold = draft.bold,
+                    italic = draft.italic,
+                    onBackgroundChange = { draft = draft.copy(backgroundColor = it) },
+                    onTextColorChange = { draft = draft.copy(textColor = it) },
+                    onBoldChange = { draft = draft.copy(bold = it) },
+                    onItalicChange = { draft = draft.copy(italic = it) },
+                )
+                TextAlignPicker(value = draft.textAlign, onChange = { draft = draft.copy(textAlign = it) })
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        checked = draft.editable == true,
+                        onCheckedChange = { draft = draft.copy(editable = if (it) true else null) },
+                    )
+                    Text("Szerkeszthető szövegmező a jegyzőkönyvben")
+                }
+            }
+        },
+        confirmButton = { Button(onClick = { onConfirm(draftText, draft) }) { ButtonText(stringResource(R.string.action_save)) } },
+        dismissButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onDelete) { ButtonText(stringResource(R.string.template_editor_block_delete)) }
+                OutlinedButton(onClick = onDismiss) { ButtonText(stringResource(R.string.action_cancel)) }
+            }
+        },
+    )
+
+    if (showSpecialDialog) {
+        SpecialCellElementDialog(
+            onDismiss = { showSpecialDialog = false },
+            onInsert = { token ->
+                draftText += token
+                showSpecialDialog = false
+            },
+        )
+    }
+}
+
+@Composable
 private fun StyledBlockSettingsDialog(
     settings: TableCellSettings,
     onDismiss: () -> Unit,
@@ -1511,8 +1643,12 @@ private fun StyledBlockSettingsDialog(
                 ColorSettingButtons(
                     backgroundColor = draft.backgroundColor,
                     textColor = draft.textColor,
+                    bold = draft.bold,
+                    italic = draft.italic,
                     onBackgroundChange = { draft = draft.copy(backgroundColor = it) },
                     onTextColorChange = { draft = draft.copy(textColor = it) },
+                    onBoldChange = { draft = draft.copy(bold = it) },
+                    onItalicChange = { draft = draft.copy(italic = it) },
                 )
                 TextAlignPicker(value = draft.textAlign, onChange = { draft = draft.copy(textAlign = it) })
                 Row(verticalAlignment = Alignment.CenterVertically) {

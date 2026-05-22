@@ -151,6 +151,8 @@ object TemplateContentCodec {
         put("tickCheckedBackgroundColor", tickCheckedBackgroundColor)
         put("tickCheckedTextColor", tickCheckedTextColor)
         editable?.let { put("editable", it) }
+        put("bold", bold)
+        put("italic", italic)
         put("hideIfEmpty", hideIfEmpty)
         put("mergeAll", mergeAll)
         put("headerRow", headerRow)
@@ -165,6 +167,8 @@ object TemplateContentCodec {
         put("tickCheckedBackgroundColor", tickCheckedBackgroundColor)
         put("tickCheckedTextColor", tickCheckedTextColor)
         editable?.let { put("editable", it) }
+        put("bold", bold)
+        put("italic", italic)
         put("hideIfEmpty", hideIfEmpty)
         put("toggleCheck", toggleCheck)
         put("mergeRight", mergeRight)
@@ -181,6 +185,8 @@ object TemplateContentCodec {
             tickCheckedBackgroundColor = optString("tickCheckedBackgroundColor", ""),
             tickCheckedTextColor = optString("tickCheckedTextColor", ""),
             editable = if (has("editable")) optBoolean("editable") else null,
+            bold = optBoolean("bold", false),
+            italic = optBoolean("italic", false),
             hideIfEmpty = optBoolean("hideIfEmpty", false),
             mergeAll = optBoolean("mergeAll", false),
             headerRow = optBoolean("headerRow", false),
@@ -198,6 +204,8 @@ object TemplateContentCodec {
             tickCheckedBackgroundColor = optString("tickCheckedBackgroundColor", ""),
             tickCheckedTextColor = optString("tickCheckedTextColor", ""),
             editable = if (has("editable")) optBoolean("editable") else null,
+            bold = optBoolean("bold", false),
+            italic = optBoolean("italic", false),
             hideIfEmpty = optBoolean("hideIfEmpty", false),
             toggleCheck = optBoolean("toggleCheck", false),
             mergeRight = optBoolean("mergeRight", false),

@@ -79,7 +79,7 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
 
     private fun appendTemplateBlock(parent: org.jsoup.nodes.Element, block: TemplateBlock, todayIso: String, profile: UserProfile?) {
         when (block) {
-            is TemplateBlock.Text -> appendTextTemplateBlock(parent, block)
+            is TemplateBlock.Text -> appendTextTemplateBlock(parent, block, todayIso, profile)
             is TemplateBlock.Date -> {
                 val div = parent.appendElement("div").addClass("date-block").text(todayIso)
                 applyBlockStyle(div, block.settings)
@@ -107,12 +107,15 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
         }
     }
 
-    private fun appendTextTemplateBlock(parent: org.jsoup.nodes.Element, block: TemplateBlock.Text) {
+    private fun appendTextTemplateBlock(parent: org.jsoup.nodes.Element, block: TemplateBlock.Text, todayIso: String, profile: UserProfile?) {
         val div = parent.appendElement("div")
             .addClass("text-block")
             .attr("data-template-block-id", block.id)
         applyBlockStyle(div, block.settings)
-        val paragraph = div.appendElement("p").text(block.text)
+        val paragraph = div.appendElement("p").text(replaceSpecialTokens(block.text, "1", todayIso, profile))
+        if (block.text.contains(PAGE_NUMBER_TOKEN)) {
+            paragraph.attr("data-page-number-template", replaceSpecialTokens(block.text, PAGE_NUMBER_TOKEN, todayIso, profile))
+        }
         if (block.settings.editable == true) {
             paragraph.attr("contenteditable", "true")
                 .attr("data-field", "text_${block.id}")
@@ -125,6 +128,8 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
             if (settings.backgroundColor.isNotBlank()) add("background:${settings.backgroundColor}")
             if (settings.textColor.isNotBlank()) add("color:${settings.textColor}")
             if (settings.textAlign.isNotBlank()) add("text-align:${settings.textAlign}")
+            if (settings.bold) add("font-weight:bold")
+            if (settings.italic) add("font-style:italic")
         }
         if (styles.isNotEmpty()) element.attr("style", styles.joinToString(";"))
     }
@@ -181,6 +186,8 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
                     ?: rowSettings.textAlign.takeIf { it != "left" }
                     ?: columnSettings.textAlign.takeIf { it != "left" }
                     ?: "left"
+                val bold = cellSettings.bold || rowSettings.bold || columnSettings.bold
+                val italic = cellSettings.italic || rowSettings.italic || columnSettings.italic
                 if (cellSettings.toggleCheck) {
                     cell.attr("data-toggle-check", "true")
                     if (tickXBackground.isNotBlank()) cell.attr("data-x-bg", tickXBackground)
@@ -195,7 +202,9 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
                     if (background.isNotBlank()) add("background:$background")
                     if (textColor.isNotBlank()) add("color:$textColor")
                     add("text-align:${if (cellSettings.toggleCheck) "center" else textAlign}")
-                    if (cellSettings.toggleCheck) add("width:32px;font-weight:bold")
+                    if (bold || cellSettings.toggleCheck) add("font-weight:bold")
+                    if (italic) add("font-style:italic")
+                    if (cellSettings.toggleCheck) add("width:32px")
                 }.joinToString(";")
                 if (style.isNotBlank()) cell.attr("style", style)
                 if (cellSettings.hideIfEmpty) cell.attr("data-hide-if-empty", "true")
@@ -357,7 +366,7 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
     private fun appendSafetyExtraTemplateBlocks(parent: org.jsoup.nodes.Element, content: TemplateContent, todayIso: String, profile: UserProfile?) {
         content.blocks.filterNot { it is TemplateBlock.Date }.forEach { block ->
             when (block) {
-                is TemplateBlock.Text -> appendTextTemplateBlock(parent, block)
+                is TemplateBlock.Text -> appendTextTemplateBlock(parent, block, todayIso, profile)
                 is TemplateBlock.Table -> appendEditableTable(parent, block, todayIso, profile)
                 is TemplateBlock.Signature -> appendSignature(parent, profile)
                 is TemplateBlock.Stamp -> appendStamp(parent, profile)

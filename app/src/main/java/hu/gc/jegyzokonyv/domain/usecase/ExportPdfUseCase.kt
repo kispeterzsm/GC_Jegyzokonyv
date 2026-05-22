@@ -141,6 +141,8 @@ class ExportPdfUseCase @Inject constructor(
             backgroundColor = parseCssColor(style["background"] ?: style["background-color"]),
             textColor = parseCssColor(style["color"]),
             textAlign = style.toTextAlign(),
+            bold = style["font-weight"]?.contains("bold", ignoreCase = true) == true,
+            italic = style["font-style"]?.contains("italic", ignoreCase = true) == true,
         )
     }
 
@@ -150,6 +152,8 @@ class ExportPdfUseCase @Inject constructor(
             backgroundColor = parseCssColor(style["background"] ?: style["background-color"]),
             textColor = parseCssColor(style["color"]),
             textAlign = style.toTextAlign(),
+            bold = style["font-weight"]?.contains("bold", ignoreCase = true) == true,
+            italic = style["font-style"]?.contains("italic", ignoreCase = true) == true,
         )
     }
 
@@ -197,6 +201,7 @@ class ExportPdfUseCase @Inject constructor(
                 else -> TextAlign.Left
             },
             bold = normalName() == "th" || style["font-weight"]?.contains("bold", ignoreCase = true) == true,
+            italic = style["font-style"]?.contains("italic", ignoreCase = true) == true,
         )
     }
 
@@ -255,7 +260,7 @@ class ExportPdfUseCase @Inject constructor(
     private fun blockText(element: Element): String? {
         val paragraphs = element.select("p")
         val text = if (paragraphs.isNotEmpty()) {
-            paragraphs.joinToString("\n") { it.wholeText().trim() }
+            paragraphs.joinToString("\n") { it.attr("data-page-number-template").ifBlank { it.wholeText().trim() } }
         } else {
             element.wholeText().trim()
         }
@@ -863,13 +868,6 @@ class ExportPdfUseCase @Inject constructor(
 
         fun render(): ExportStats {
             startPage()
-            drawWrappedText(document.title, titlePaint, spacingAfter = 6f)
-            canvas.drawLine(PAGE_MARGIN_PT, y, PAGE_WIDTH_PT - PAGE_MARGIN_PT, y, linePaint)
-            y += 14f
-
-            document.meta?.let {
-                drawWrappedText(it, metaPaint, spacingAfter = 12f)
-            }
 
             document.blocks.forEach { block ->
                 when (block) {
@@ -900,12 +898,18 @@ class ExportPdfUseCase @Inject constructor(
                 TextBlockStyle.Body -> bodyPaint
                 TextBlockStyle.Date -> datePaint
             }
-            val paint = TextPaint(basePaint).apply { block.textColor?.let { color = it } }
+            val paint = TextPaint(basePaint).apply {
+                block.textColor?.let { color = it }
+                typeface = styledTypeface(block.bold, block.italic)
+            }
             drawWrappedText(block.text, paint, spacingAfter = 10f, backgroundColor = block.backgroundColor, textAlign = block.textAlign)
         }
 
         private fun drawPageNumber(block: ExportBlock.PageNumber, spacingAfter: Float) {
-            val paint = TextPaint(bodyPaint).apply { block.textColor?.let { color = it } }
+            val paint = TextPaint(bodyPaint).apply {
+                block.textColor?.let { color = it }
+                typeface = styledTypeface(block.bold, block.italic)
+            }
             drawWrappedText(pageNumber.toString(), paint, spacingAfter = spacingAfter, backgroundColor = block.backgroundColor, textAlign = block.textAlign)
         }
 
@@ -954,6 +958,7 @@ class ExportPdfUseCase @Inject constructor(
             canvas.drawRect(rect, placeholderPaint)
             val paint = TextPaint(if (cell.bold) datePaint else bodyPaint).apply {
                 color = cell.textColor ?: (if (cell.bold) datePaint.color else bodyPaint.color)
+                typeface = styledTypeface(cell.bold, cell.italic)
             }
             val alignment = when (cell.textAlign) {
                 TextAlign.Center -> Layout.Alignment.ALIGN_CENTER
@@ -1359,6 +1364,8 @@ class ExportPdfUseCase @Inject constructor(
             val backgroundColor: Int? = null,
             val textColor: Int? = null,
             val textAlign: TextAlign = TextAlign.Left,
+            val bold: Boolean = false,
+            val italic: Boolean = false,
         ) : ExportBlock()
 
         data class Photo(
@@ -1382,6 +1389,8 @@ class ExportPdfUseCase @Inject constructor(
             val backgroundColor: Int? = null,
             val textColor: Int? = null,
             val textAlign: TextAlign = TextAlign.Left,
+            val bold: Boolean = false,
+            val italic: Boolean = false,
         ) : ExportBlock()
     }
 
@@ -1393,6 +1402,7 @@ class ExportPdfUseCase @Inject constructor(
         val textColor: Int? = null,
         val textAlign: TextAlign = TextAlign.Left,
         val bold: Boolean = false,
+        val italic: Boolean = false,
     )
 
     private enum class TextAlign { Left, Center, Right }
@@ -1459,6 +1469,16 @@ class ExportPdfUseCase @Inject constructor(
             textSize = size
             this.typeface = typeface
         }
+
+        fun styledTypeface(bold: Boolean, italic: Boolean): Typeface = Typeface.create(
+            Typeface.DEFAULT,
+            when {
+                bold && italic -> Typeface.BOLD_ITALIC
+                bold -> Typeface.BOLD
+                italic -> Typeface.ITALIC
+                else -> Typeface.NORMAL
+            },
+        )
 
         fun staticLayout(
             text: String,
