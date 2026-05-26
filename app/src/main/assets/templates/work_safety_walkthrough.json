@@ -56,11 +56,6 @@
       }
     },
     {
-      "id": "builtin-work-safety-legend",
-      "type": "text",
-      "text": "Megfelelt: ✓    Nem felelt meg: X"
-    },
-    {
       "id": "builtin-work-safety-actions-title",
       "type": "text",
       "text": "Az együttműködés előmozdítása érdekében tett intézkedések",
@@ -517,10 +512,6 @@
           }
         ]
       ]
-    },
-    {
-      "id": "builtin-work-safety-after-risk",
-      "type": "page_break"
     },
     {
       "id": "builtin-work-safety-checklist-header-1",
@@ -1683,10 +1674,6 @@
       "type": "page_break"
     },
     {
-      "id": "builtin-work-safety-signature",
-      "type": "signature"
-    },
-    {
       "id": "builtin-work-safety-images",
       "type": "images",
       "blocks": [
@@ -1889,6 +1876,10 @@
           "type": "page_break"
         }
       ]
+    },
+    {
+      "id": "builtin-work-safety-signature",
+      "type": "signature"
     }
   ]
 }
