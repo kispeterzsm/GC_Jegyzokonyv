@@ -1189,9 +1189,15 @@ class ExportPdfUseCase @Inject constructor(
             val captionHeight = captionLayout?.height?.toFloat() ?: 0f
             val captionGap = if (captionLayout == null) 0f else 5f
 
+            var availableImageHeight = currentBottomY - y - reservedSpaceAfterPhoto - captionGap - captionHeight - 12f
+            if (availableImageHeight < MIN_PHOTO_HEIGHT_PT && y > topContentY && allowPagination) {
+                startPage()
+                availableImageHeight = currentBottomY - y - reservedSpaceAfterPhoto - captionGap - captionHeight - 12f
+            }
+
             var drawWidth = CONTENT_WIDTH_PT
             var drawHeight = drawWidth * displaySize.height.toFloat() / displaySize.width.toFloat()
-            val maxImageHeight = ((currentBottomY - topContentY - reservedSpaceAfterPhoto) - captionGap - captionHeight).coerceAtLeast(96f)
+            val maxImageHeight = availableImageHeight.coerceAtLeast(MIN_PHOTO_HEIGHT_PT)
             if (drawHeight > maxImageHeight) {
                 val scale = maxImageHeight / drawHeight
                 drawWidth *= scale
@@ -1199,8 +1205,17 @@ class ExportPdfUseCase @Inject constructor(
             }
 
             val blockHeight = drawHeight + captionGap + captionHeight + 12f
-            if (y + blockHeight > currentBottomY && y > topContentY) {
-                if (allowPagination) startPage() else return
+            if (y + blockHeight + reservedSpaceAfterPhoto > currentBottomY && y > topContentY) {
+                if (allowPagination) {
+                    startPage()
+                    availableImageHeight = currentBottomY - y - reservedSpaceAfterPhoto - captionGap - captionHeight - 12f
+                    val resizedMaxHeight = availableImageHeight.coerceAtLeast(MIN_PHOTO_HEIGHT_PT)
+                    if (drawHeight > resizedMaxHeight) {
+                        val scale = resizedMaxHeight / drawHeight
+                        drawWidth *= scale
+                        drawHeight *= scale
+                    }
+                } else return
             }
 
             val left = PAGE_MARGIN_PT + ((CONTENT_WIDTH_PT - drawWidth) / 2f)
@@ -1574,6 +1589,7 @@ class ExportPdfUseCase @Inject constructor(
         const val MIN_TABLE_ROW_HEIGHT_PT = 28f
         const val TABLE_CELL_PADDING_PT = 4f
         const val MIN_TABLE_TEXT_SIZE_PT = 6f
+        const val MIN_PHOTO_HEIGHT_PT = 36f
         const val SAFETY_MARGIN_PT = 42f
         const val SAFETY_WIDTH_PT = PAGE_WIDTH_PT - (SAFETY_MARGIN_PT * 2f)
         const val OBSERVATION_TABLE_HEIGHT_PT = 310f
