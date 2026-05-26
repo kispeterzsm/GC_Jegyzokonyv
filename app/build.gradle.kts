@@ -14,8 +14,8 @@ android {
         applicationId = "hu.gc.jegyzokonyv"
         minSdk = 26
         targetSdk = 34
-        versionCode = 14
-        versionName = "0.5.7"
+        versionCode = 15
+        versionName = "0.5.8"
 
         vectorDrawables { useSupportLibrary = true }
     }
