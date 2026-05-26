@@ -52,6 +52,9 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
             page.select("*").forEach { element ->
                 element.textNodes().forEach { textNode ->
                     if (textNode.text().contains(IMAGE_INDEX_TOKEN)) {
+                        textNode.parent()
+                            ?.attr("data-image-index", "true")
+                            ?.attr("data-image-index-template", textNode.text())
                         textNode.text(textNode.text().replace(IMAGE_INDEX_TOKEN, imageIndex.toString()))
                     }
                 }

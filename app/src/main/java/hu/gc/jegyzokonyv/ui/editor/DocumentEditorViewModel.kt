@@ -59,21 +59,14 @@ class DocumentEditorViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            val loaded = draftRepository.loadHtml(draftId)
-            _html.value = loaded
-            lastHtmlFromEditor = loaded
-            lastSavedHtml = loaded
-            savedRevision.set(htmlRevision.get())
+            markHtmlLoadedFromRepository(draftRepository.loadHtml(draftId))
         }
     }
 
     fun reloadHtml() {
         viewModelScope.launch {
             flushEditorHtml()
-            val loaded = draftRepository.loadHtml(draftId)
-            _html.value = loaded
-            lastHtmlFromEditor = loaded
-            lastSavedHtml = loaded
+            markHtmlLoadedFromRepository(draftRepository.loadHtml(draftId))
         }
     }
 
@@ -81,10 +74,7 @@ class DocumentEditorViewModel @Inject constructor(
         viewModelScope.launch {
             flushEditorHtml()
             draftRepository.setTitle(draftId, newTitle)
-            val loaded = draftRepository.loadHtml(draftId)
-            _html.value = loaded
-            lastHtmlFromEditor = loaded
-            lastSavedHtml = loaded
+            markHtmlLoadedFromRepository(draftRepository.loadHtml(draftId))
         }
     }
 
@@ -94,15 +84,13 @@ class DocumentEditorViewModel @Inject constructor(
         viewModelScope.launch {
             flushEditorHtml()
             draftRepository.appendTextBlock(draftId, text.trim())
-            val loaded = draftRepository.loadHtml(draftId)
-            _html.value = loaded
-            lastHtmlFromEditor = loaded
-            lastSavedHtml = loaded
+            markHtmlLoadedFromRepository(draftRepository.loadHtml(draftId))
         }
     }
 
     fun onDocumentHtmlChanged(html: String) {
         if (html.isBlank()) return
+        _html.value = html
         val revision = htmlRevision.incrementAndGet()
         lastHtmlFromEditor = html
         pendingSaveJob = viewModelScope.launch {
@@ -121,10 +109,7 @@ class DocumentEditorViewModel @Inject constructor(
         viewModelScope.launch {
             flushEditorHtml()
             draftRepository.appendPhotoBlock(draftId, relativePath, caption?.takeIf { it.isNotBlank() })
-            val loaded = draftRepository.loadHtml(draftId)
-            _html.value = loaded
-            lastHtmlFromEditor = loaded
-            lastSavedHtml = loaded
+            markHtmlLoadedFromRepository(draftRepository.loadHtml(draftId))
         }
     }
 
@@ -157,6 +142,14 @@ class DocumentEditorViewModel @Inject constructor(
     }
 
     fun draftFolder(): File = draftRepository.draftDir(draftId)
+
+    private fun markHtmlLoadedFromRepository(html: String) {
+        _html.value = html
+        lastHtmlFromEditor = html
+        lastSavedHtml = html
+        val revision = htmlRevision.incrementAndGet()
+        savedRevision.set(revision)
+    }
 
     private suspend fun flushEditorHtml() {
         pendingSaveJob?.join()

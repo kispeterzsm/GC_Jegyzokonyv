@@ -1,11 +1,14 @@
 package hu.gc.jegyzokonyv.ui.editor
 
+import android.app.AlertDialog
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Matrix
 import android.media.ExifInterface
 import android.webkit.JavascriptInterface
+import android.webkit.JsResult
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
@@ -66,12 +69,14 @@ fun EditorHtmlWebView(
                 settings.useWideViewPort = false
                 settings.blockNetworkLoads = true
                 addJavascriptInterface(bridge, BRIDGE_NAME)
+                webChromeClient = ConfirmingWebChromeClient()
                 webViewClient = DraftFileWebViewClient(draftDir)
                 setBackgroundColor(Color.WHITE)
             }
         },
         update = { view ->
             webViewHolder[0] = view
+            bridge.attach(view, view.getTag(EDITOR_TOKEN_TAG) as? Int)
             (view.webViewClient as? DraftFileWebViewClient)?.draftDir = draftDir
             val htmlChanged = view.getTag(LOADED_HTML_TAG) != html
             val lastScrollToken = view.getTag(SCROLL_TO_BOTTOM_TOKEN_TAG) as? Int
@@ -81,7 +86,10 @@ fun EditorHtmlWebView(
             if (htmlChanged) {
                 val baseUrl = draftDir.toWebViewBaseUrl()
                 val displayHtml = embedDraftImages(html, draftDir)
-                val editableHtml = injectEditBridge(displayHtml)
+                val editorToken = ((view.getTag(EDITOR_TOKEN_TAG) as? Int) ?: 0) + 1
+                view.setTag(EDITOR_TOKEN_TAG, editorToken)
+                bridge.attach(view, editorToken)
+                val editableHtml = injectEditBridge(displayHtml, editorToken)
                 view.setTag(LOADED_HTML_TAG, html)
                 view.setTag(SCROLL_TO_BOTTOM_AFTER_LOAD_TAG, shouldScrollAfterLoad)
                 if (lastScrollToken == null || shouldScrollAfterLoad) {
@@ -108,23 +116,37 @@ private class EditorBridge(
     private val onHtmlChanged: (String) -> Unit,
     private val onEditableCellFocusedChanged: (Boolean) -> Unit,
 ) {
+    @Volatile private var currentWebView: WebView? = null
+    @Volatile private var currentEditorToken: Int? = null
+
+    fun attach(webView: WebView, editorToken: Int?) {
+        currentWebView = webView
+        currentEditorToken = editorToken
+    }
+
     @JavascriptInterface
-    fun save(html: String) {
-        onHtmlChanged(html)
+    fun save(editorToken: Int, html: String) {
+        val view = currentWebView ?: return
+        view.post {
+            if (editorToken != currentEditorToken) return@post
+            view.setTag(LOADED_HTML_TAG, html)
+            onHtmlChanged(html)
+        }
     }
 
     @JavascriptInterface
     fun editableFocused(focused: Boolean) {
-        onEditableCellFocusedChanged(focused)
+        currentWebView?.post { onEditableCellFocusedChanged(focused) }
     }
 }
 
-private fun injectEditBridge(html: String): String {
+private fun injectEditBridge(html: String, editorToken: Int): String {
     val hasEditableContent = html.contains("contenteditable=\"true\"")
     val hasToggleChecks = html.contains("data-toggle-check=\"true\"")
     val hasImagePreviews = html.contains("data-editor-image-preview=\"true\"")
+    val hasImagePages = html.contains("image-page")
     val hasExportGuides = html.contains("repeat-header") || html.contains("repeat-footer") || html.contains("template-page-break")
-    if (!hasEditableContent && !hasToggleChecks && !hasImagePreviews && !hasExportGuides) return html
+    if (!hasEditableContent && !hasToggleChecks && !hasImagePreviews && !hasImagePages && !hasExportGuides) return html
     val cleanHtml = html
         .replace(Regex("""(?s)<script data-editor-bridge="true">.*?</script>"""), "")
         .replace(Regex("""(?s)<style data-editor-runtime="true">.*?</style>"""), "")
@@ -137,7 +159,24 @@ private fun injectEditBridge(html: String): String {
             .repeat-footer::before { content: "Ismétlődő lábléc"; }
             .template-page-break { position: relative !important; height: 1px !important; margin: 18px 0 !important; border-top: 1px dashed #999 !important; }
             .template-page-break::after { content: "Oldaltörés"; position: relative; top: -9px; left: 50%; transform: translateX(-50%); display: inline-block; background: #fff; color: #666; font-size: 11px; padding: 0 6px; }
-            .image-page { break-inside: avoid; page-break-inside: avoid; }
+            .image-page { position: relative !important; break-inside: avoid; page-break-inside: avoid; }
+            .editor-delete-image-page {
+              position: absolute !important;
+              top: 8px !important;
+              right: 8px !important;
+              z-index: 2147483647 !important;
+              min-width: 34px !important;
+              height: 34px !important;
+              border: 0 !important;
+              border-radius: 999px !important;
+              background: rgba(185, 28, 28, 0.92) !important;
+              color: #fff !important;
+              font-size: 20px !important;
+              line-height: 34px !important;
+              text-align: center !important;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.28) !important;
+              cursor: pointer !important;
+            }
             body.safety-walkthrough { font-size: 10px !important; }
             body.safety-walkthrough .safety-page { min-height: auto !important; padding: 12px 8px 18px !important; }
             body.safety-walkthrough .safety-header { margin-bottom: 8px !important; }
@@ -195,7 +234,7 @@ private fun injectEditBridge(html: String): String {
           function saveNow() {
             if (window.$BRIDGE_NAME && window.$BRIDGE_NAME.save) {
               var clone = document.documentElement.cloneNode(true);
-              clone.querySelectorAll('script[data-editor-bridge="true"]').forEach(function(node) {
+              clone.querySelectorAll('script[data-editor-bridge="true"], style[data-editor-runtime="true"], .editor-delete-image-page').forEach(function(node) {
                 node.parentNode.removeChild(node);
               });
               clone.querySelectorAll('img[data-relative-src]').forEach(function(img) {
@@ -214,7 +253,7 @@ private fun injectEditBridge(html: String): String {
               var serialized = clone.outerHTML;
               if (serialized === lastSavedHtml) return;
               lastSavedHtml = serialized;
-              window.$BRIDGE_NAME.save(serialized);
+              window.$BRIDGE_NAME.save($editorToken, serialized);
             }
           }
           function notifyFocus(focused) {
@@ -234,6 +273,40 @@ private fun injectEditBridge(html: String): String {
             cell.textContent = current === '✓' ? 'X' : '✓';
             applyCheckStyle(cell);
             saveNow();
+          }
+          function installImagePageDeleteButtons() {
+            document.querySelectorAll('.image-page').forEach(function(page) {
+              if (page.querySelector(':scope > .editor-delete-image-page')) return;
+              var button = document.createElement('button');
+              button.type = 'button';
+              button.className = 'editor-delete-image-page';
+              button.setAttribute('aria-label', 'Képoldal törlése');
+              button.setAttribute('title', 'Képoldal törlése');
+              button.textContent = '×';
+              page.insertBefore(button, page.firstChild);
+            });
+          }
+          function imageIndexText(node, numberText) {
+            var template = node.getAttribute('data-image-index-template') || '{{kep_sorszam}}.';
+            return template.replace(/\{\{kep_sorszam\}\}/g, numberText);
+          }
+          function renumberImagePages() {
+            document.querySelectorAll('.image-page').forEach(function(page, pageIndex) {
+              var numberText = String(pageIndex + 1);
+              page.querySelectorAll('[data-image-index="true"]').forEach(function(node) {
+                node.textContent = imageIndexText(node, numberText);
+              });
+              var firstRow = page.querySelector('table tr');
+              var cells = firstRow ? firstRow.querySelectorAll('th,td') : [];
+              var lastCell = cells.length ? cells[cells.length - 1] : null;
+              if (!lastCell) return;
+              if (page.querySelector('[data-image-index="true"]') && !lastCell.hasAttribute('data-image-index')) return;
+              if (/^\s*\d+\.?\s*$/.test(lastCell.textContent || '')) {
+                lastCell.setAttribute('data-image-index', 'true');
+                lastCell.setAttribute('data-image-index-template', '{{kep_sorszam}}.');
+                lastCell.textContent = numberText + '.';
+              }
+            });
           }
           function storeSelection() {
             var selection = window.getSelection();
@@ -284,9 +357,26 @@ private fun injectEditBridge(html: String): String {
             save: saveNow
           };
           document.querySelectorAll('[data-toggle-check="true"]').forEach(applyCheckStyle);
+          installImagePageDeleteButtons();
+          renumberImagePages();
           document.addEventListener('click', function(event) {
             var target = event.target;
             if (!target || !target.closest) return;
+            var deleteButton = target.closest('.editor-delete-image-page');
+            if (deleteButton) {
+              var page = deleteButton.closest('.image-page');
+              if (!page) return;
+              event.preventDefault();
+              event.stopPropagation();
+              if (!window.confirm('Biztosan törli ezt a képoldalt?')) return;
+              page.parentNode.removeChild(page);
+              renumberImagePages();
+              activeEditable = null;
+              savedRange = null;
+              notifyFocus(false);
+              saveNow();
+              return;
+            }
             var cell = target.closest('[data-toggle-check="true"]');
             if (!cell) return;
             event.preventDefault();
@@ -467,6 +557,24 @@ private fun isRelativeDraftImage(src: String): Boolean =
         !src.startsWith("//") &&
         !src.contains(":")
 
+private class ConfirmingWebChromeClient : WebChromeClient() {
+    override fun onJsConfirm(
+        view: WebView?,
+        url: String?,
+        message: String?,
+        result: JsResult?,
+    ): Boolean {
+        val context = view?.context ?: return false
+        AlertDialog.Builder(context)
+            .setMessage(message.orEmpty())
+            .setPositiveButton(android.R.string.ok) { _, _ -> result?.confirm() }
+            .setNegativeButton(android.R.string.cancel) { _, _ -> result?.cancel() }
+            .setOnCancelListener { result?.cancel() }
+            .show()
+        return true
+    }
+}
+
 private class DraftFileWebViewClient(
     var draftDir: File,
 ) : WebViewClient() {
@@ -526,5 +634,6 @@ private const val DICTATION_TOKEN_TAG = 0x55443323
 private const val SCROLL_TO_BOTTOM_TOKEN_TAG = 0x55443324
 private const val SCROLL_TO_BOTTOM_AFTER_LOAD_TAG = 0x55443325
 private const val SCROLL_TO_BOTTOM_PENDING_TOKEN_TAG = 0x55443326
+private const val EDITOR_TOKEN_TAG = 0x55443327
 private const val MAX_PREVIEW_IMAGE_SIDE = 1600
 private const val PREVIEW_JPEG_QUALITY = 82
