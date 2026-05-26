@@ -3,11 +3,11 @@ package hu.gc.jegyzokonyv.ui.editor
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -104,6 +104,7 @@ fun DocumentEditorScreen(
     val dictationFailedMsg = stringResource(R.string.editor_dictation_failed)
     val dictationNoCellMsg = stringResource(R.string.editor_dictation_no_cell)
     var isListening by remember { mutableStateOf(false) }
+    var lastPartialDictation by remember { mutableStateOf("") }
 
     val onDictationResult by rememberUpdatedState<(String) -> Unit> { text ->
         if (text.isNotBlank()) {
@@ -113,13 +114,24 @@ fun DocumentEditorScreen(
     }
     val onDictationError by rememberUpdatedState<(String) -> Unit> { message ->
         isListening = false
-        snackbarScope.launch { snackbarHostState.showSnackbar(message) }
+        if (lastPartialDictation.isNotBlank()) {
+            onDictationResult(lastPartialDictation)
+            lastPartialDictation = ""
+        } else {
+            snackbarScope.launch { snackbarHostState.showSnackbar(message) }
+        }
     }
-    val speechRecognizer = rememberOnDeviceHungarianSpeechRecognizer(
-        onReady = { isListening = true },
+    val speechRecognizer = rememberHungarianSpeechRecognizer(
+        onReady = {
+            lastPartialDictation = ""
+            isListening = true
+        },
+        onPartialText = { text -> lastPartialDictation = text },
         onFinalText = { text ->
             isListening = false
-            onDictationResult(text)
+            val recognizedText = text.ifBlank { lastPartialDictation }
+            lastPartialDictation = ""
+            onDictationResult(recognizedText)
         },
         onError = { onDictationError(dictationFailedMsg) },
     )
@@ -228,8 +240,7 @@ fun DocumentEditorScreen(
                 isDictating = isListening,
                 onDictate = {
                     if (isListening) {
-                        speechRecognizer?.cancel()
-                        isListening = false
+                        speechRecognizer?.stopListening()
                     } else if (!focusedEditableCell) {
                         snackbarScope.launch { snackbarHostState.showSnackbar(dictationNoCellMsg) }
                     } else if (speechRecognizer == null) {
@@ -400,44 +411,56 @@ private fun BottomActionBar(
 }
 
 @Composable
-private fun rememberOnDeviceHungarianSpeechRecognizer(
+private fun rememberHungarianSpeechRecognizer(
     onReady: () -> Unit,
+    onPartialText: (String) -> Unit,
     onFinalText: (String) -> Unit,
     onError: () -> Unit,
 ): SpeechRecognizer? {
     val context = LocalContext.current
     val currentOnReady by rememberUpdatedState(onReady)
+    val currentOnPartialText by rememberUpdatedState(onPartialText)
     val currentOnFinalText by rememberUpdatedState(onFinalText)
     val currentOnError by rememberUpdatedState(onError)
     return remember(context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
-            !SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
-        ) {
+        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
             null
         } else {
-            SpeechRecognizer.createOnDeviceSpeechRecognizer(context).apply {
-                setRecognitionListener(object : RecognitionListener {
-                    override fun onReadyForSpeech(params: Bundle?) {
-                        currentOnReady()
-                    }
+            runCatching {
+                SpeechRecognizer.createSpeechRecognizer(context).apply {
+                    setRecognitionListener(object : RecognitionListener {
+                        override fun onReadyForSpeech(params: Bundle?) {
+                            currentOnReady()
+                        }
 
-                    override fun onBeginningOfSpeech() = Unit
-                    override fun onRmsChanged(rmsdB: Float) = Unit
-                    override fun onBufferReceived(buffer: ByteArray?) = Unit
-                    override fun onEndOfSpeech() = Unit
+                        override fun onBeginningOfSpeech() = Unit
+                        override fun onRmsChanged(rmsdB: Float) = Unit
+                        override fun onBufferReceived(buffer: ByteArray?) = Unit
+                        override fun onEndOfSpeech() = Unit
 
-                    override fun onError(error: Int) {
-                        currentOnError()
-                    }
+                        override fun onError(error: Int) {
+                            Log.w(DICTATION_LOG_TAG, "Speech recognition error: $error")
+                            currentOnError()
+                        }
 
-                    override fun onResults(results: Bundle?) {
-                        currentOnFinalText(bestSpeechResult(results))
-                    }
+                        override fun onResults(results: Bundle?) {
+                            val text = bestSpeechResult(results)
+                            Log.d(DICTATION_LOG_TAG, "Speech recognition result: $text")
+                            currentOnFinalText(text)
+                        }
 
-                    override fun onPartialResults(partialResults: Bundle?) = Unit
-                    override fun onEvent(eventType: Int, params: Bundle?) = Unit
-                })
-            }
+                        override fun onPartialResults(partialResults: Bundle?) {
+                            val text = bestSpeechResult(partialResults)
+                            if (text.isNotBlank()) {
+                                Log.d(DICTATION_LOG_TAG, "Speech recognition partial: $text")
+                                currentOnPartialText(text)
+                            }
+                        }
+
+                        override fun onEvent(eventType: Int, params: Bundle?) = Unit
+                    })
+                }
+            }.getOrNull()
         }
     }
 }
@@ -452,13 +475,17 @@ private fun EditorButtonText(text: String) {
     )
 }
 
+private const val DICTATION_LOG_TAG = "JegyzokonyvDictation"
+
 private fun hungarianSpeechIntent(): Intent =
     Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
         putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
         putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hu-HU")
         putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "hu-HU")
         putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-        putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+        putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+        putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1500L)
+        putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1000L)
     }
 
 private fun bestSpeechResult(results: Bundle?): String =

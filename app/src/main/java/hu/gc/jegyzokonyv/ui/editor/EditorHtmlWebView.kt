@@ -250,8 +250,11 @@ private fun injectEditBridge(html: String): String {
           function notifyEditableFocusAfterBlur() {
             window.setTimeout(function() {
               var focused = document.activeElement && document.activeElement.isContentEditable;
-              if (!focused) activeEditable = null;
-              notifyFocus(!!focused);
+              if (focused) {
+                activeEditable = document.activeElement;
+                storeSelection();
+              }
+              notifyFocus(!!activeEditable);
             }, 0);
           }
           function insertText(text) {
