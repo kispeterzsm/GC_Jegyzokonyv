@@ -78,9 +78,6 @@ class ExportPdfUseCase @Inject constructor(
 
     private fun parseExportDocument(html: String, draftDir: File): ExportDocument {
         val doc = Jsoup.parse(html)
-        val title = doc.selectFirst("h1")?.wholeText()?.trim()
-            ?: doc.title().trim()
-        val meta = doc.selectFirst(".meta")?.wholeText()?.trim()?.ifBlank { null }
         val content = doc.getElementById(CONTENT_ID) ?: doc.body()
         val headerBlocks = buildList {
             content.children().filter { it.hasClass("repeat-header") }.forEach { header ->
@@ -99,8 +96,6 @@ class ExportPdfUseCase @Inject constructor(
         }
 
         return ExportDocument(
-            title = title.ifBlank { DEFAULT_TITLE },
-            meta = meta,
             headerBlocks = headerBlocks,
             footerBlocks = footerBlocks,
             blocks = blocks,
@@ -861,12 +856,6 @@ class ExportPdfUseCase @Inject constructor(
         private var reservedSpaceAfterPhoto = 0f
         private var imageCount = 0
 
-        private val titlePaint = textPaint(
-            size = 17f,
-            color = Color.rgb(26, 26, 26),
-            typeface = Typeface.DEFAULT_BOLD,
-        )
-        private val metaPaint = textPaint(size = 9f, color = Color.rgb(102, 102, 102))
         private val bodyPaint = textPaint(size = 10.5f, color = Color.rgb(26, 26, 26))
         private val datePaint = textPaint(
             size = 10.5f,
@@ -896,7 +885,6 @@ class ExportPdfUseCase @Inject constructor(
 
         fun render(): ExportStats {
             startPage()
-            drawDocumentHeading()
 
             document.blocks.forEach { block ->
                 when (block) {
@@ -920,15 +908,6 @@ class ExportPdfUseCase @Inject constructor(
         fun close() {
             runCatching { finishCurrentPage() }
             pdf.close()
-        }
-
-        private fun drawDocumentHeading() {
-            if (document.title.isBlank()) return
-            drawWrappedText(document.title, titlePaint, spacingAfter = 8f)
-            document.meta?.takeIf { it.isNotBlank() }?.let { drawWrappedText(it, metaPaint, spacingAfter = 10f) }
-            val lineY = y - 4f
-            canvas.drawLine(PAGE_MARGIN_PT, lineY, PAGE_MARGIN_PT + CONTENT_WIDTH_PT, lineY, linePaint)
-            y += 6f
         }
 
         private fun drawTextBlock(block: ExportBlock.Text) {
@@ -1438,8 +1417,6 @@ class ExportPdfUseCase @Inject constructor(
     }
 
     private data class ExportDocument(
-        val title: String,
-        val meta: String?,
         val headerBlocks: List<ExportBlock>,
         val footerBlocks: List<ExportBlock>,
         val blocks: List<ExportBlock>,
@@ -1572,7 +1549,6 @@ class ExportPdfUseCase @Inject constructor(
         const val PDF_TIMEOUT_MS = 30_000L
         const val CONTENT_ID = "content"
         const val SAFETY_CLASS = "safety-walkthrough"
-        const val DEFAULT_TITLE = "Jegyzőkönyv"
         const val LEGACY_EXPORT_IMAGES_DIR = ".pdf_images"
         const val PAGE_NUMBER_TOKEN = "{{oldalszam}}"
 
