@@ -68,7 +68,6 @@
     <string name="action_more">További</string>
 
     <string name="editor_add_photo">Fotó hozzáadása</string>
-    <string name="editor_add_text">Szöveg hozzáadása</string>
     <string name="editor_dictate">Diktálás</string>
     <string name="editor_dictation_listening">Hallgatózás…</string>
     <string name="editor_dictation_no_cell">Először érints meg egy szerkeszthető cellát.</string>
@@ -83,9 +82,6 @@
     <string name="editor_export_failed">A PDF exportálása nem sikerült.</string>
     <string name="editor_export_failed_reason">A PDF exportálása nem sikerült: %1$s</string>
     <string name="editor_no_pdf_yet">Először exportáld a jegyzőkönyvet PDF-be.</string>
-
-    <string name="dialog_add_text_title">Szöveg hozzáadása</string>
-    <string name="dialog_add_text_hint">Szöveg</string>
 
     <string name="camera_permission_required">A fotó készítéséhez kamera-engedély szükséges.</string>
     <string name="camera_permission_grant">Engedély megadása</string>

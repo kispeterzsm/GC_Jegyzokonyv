@@ -75,14 +75,6 @@ class JsoupHtmlEngine @Inject constructor() : HtmlEngine {
         return render(doc)
     }
 
-    override fun appendTextBlock(html: String, text: String): String {
-        val doc = parse(html)
-        val content = ensureContentContainer(doc)
-        val block = content.appendElement("div").addClass("text-block")
-        block.appendElement("p").text(text)
-        return render(doc)
-    }
-
     private fun appendTemplateBlock(parent: org.jsoup.nodes.Element, block: TemplateBlock, todayIso: String, profile: UserProfile?) {
         when (block) {
             is TemplateBlock.Text -> appendTextTemplateBlock(parent, block, todayIso, profile)

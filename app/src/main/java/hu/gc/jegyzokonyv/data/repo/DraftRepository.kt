@@ -16,7 +16,6 @@ interface DraftRepository {
 
     suspend fun setTitle(draftId: String, title: String)
     suspend fun appendPhotoBlock(draftId: String, relativeImagePath: String, caption: String?)
-    suspend fun appendTextBlock(draftId: String, text: String)
 
     suspend fun deleteDraft(draftId: String)
 

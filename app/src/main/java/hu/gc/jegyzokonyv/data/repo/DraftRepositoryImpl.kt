@@ -113,15 +113,6 @@ class DraftRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun appendTextBlock(draftId: String, text: String) = withContext(io) {
-        writeMutex.withLock {
-            val current = readHtml(draftId)
-            val updated = htmlEngine.appendTextBlock(current, text)
-            fileStorage.documentHtml(draftId).writeTextAtomic(updated)
-            touch(draftId)
-        }
-    }
-
     override suspend fun deleteDraft(draftId: String) = withContext(io) {
         writeMutex.withLock {
             draftDao.deleteById(draftId)

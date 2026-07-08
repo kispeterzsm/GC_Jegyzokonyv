@@ -88,7 +88,6 @@ fun DocumentEditorScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val snackbarScope = rememberCoroutineScope()
 
-    var showAddText by remember { mutableStateOf(false) }
     var showRename by remember { mutableStateOf(false) }
     var showDelete by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
@@ -234,9 +233,6 @@ fun DocumentEditorScreen(
         bottomBar = {
             BottomActionBar(
                 onAddPhoto = onTakePhoto,
-                onAddText = { showAddText = true },
-                canAddText = !isSafetyWalkthrough,
-                canDictate = focusedEditableCell,
                 isDictating = isListening,
                 onDictate = {
                     if (isListening) {
@@ -290,19 +286,6 @@ fun DocumentEditorScreen(
         }
     }
 
-    if (showAddText) {
-        AddTextDialog(
-            title = stringResource(R.string.dialog_add_text_title),
-            label = stringResource(R.string.dialog_add_text_hint),
-            confirmLabel = stringResource(R.string.action_save),
-            onDismiss = { showAddText = false },
-            onConfirm = {
-                showAddText = false
-                viewModel.onAddText(it)
-            },
-        )
-    }
-
     if (showRename) {
         AddTextDialog(
             title = stringResource(R.string.editor_title_hint),
@@ -334,9 +317,6 @@ fun DocumentEditorScreen(
 @Composable
 private fun BottomActionBar(
     onAddPhoto: () -> Unit,
-    onAddText: () -> Unit,
-    canAddText: Boolean,
-    canDictate: Boolean,
     isDictating: Boolean,
     onDictate: () -> Unit,
 ) {
@@ -363,48 +343,33 @@ private fun BottomActionBar(
                 Spacer(Modifier.size(8.dp))
                 EditorButtonText(stringResource(R.string.editor_add_photo))
             }
-            if (!canAddText) {
-                OutlinedButton(
-                    onClick = onDictate,
-                    enabled = canDictate || isDictating,
-                    colors = if (isDictating) {
-                        ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error,
-                        )
-                    } else {
-                        ButtonDefaults.outlinedButtonColors()
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = 56.dp),
-                ) {
-                    Icon(
-                        if (isDictating) Icons.Filled.Stop else Icons.Filled.Mic,
-                        contentDescription = null,
+            OutlinedButton(
+                onClick = onDictate,
+                colors = if (isDictating) {
+                    ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error,
                     )
-                    Spacer(Modifier.size(8.dp))
-                    EditorButtonText(
-                        stringResource(
-                            if (isDictating) {
-                                R.string.editor_dictation_listening
-                            } else {
-                                R.string.editor_dictate
-                            },
-                        ),
-                    )
-                }
-            }
-            if (canAddText) {
-                OutlinedButton(
-                    onClick = onAddText,
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = 56.dp),
-                ) {
-                    Icon(Icons.Filled.Edit, contentDescription = null)
-                    Spacer(Modifier.size(8.dp))
-                    EditorButtonText(stringResource(R.string.editor_add_text))
-                }
+                } else {
+                    ButtonDefaults.outlinedButtonColors()
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 56.dp),
+            ) {
+                Icon(
+                    if (isDictating) Icons.Filled.Stop else Icons.Filled.Mic,
+                    contentDescription = null,
+                )
+                Spacer(Modifier.size(8.dp))
+                EditorButtonText(
+                    stringResource(
+                        if (isDictating) {
+                            R.string.editor_dictation_listening
+                        } else {
+                            R.string.editor_dictate
+                        },
+                    ),
+                )
             }
         }
     }

@@ -7,5 +7,4 @@ interface HtmlEngine {
     fun renderTemplate(content: TemplateContent, title: String, todayIso: String, profile: UserProfile? = null): String
     fun setTitle(html: String, title: String): String
     fun appendPhotoBlock(html: String, relativeImagePath: String, caption: String?): String
-    fun appendTextBlock(html: String, text: String): String
 }

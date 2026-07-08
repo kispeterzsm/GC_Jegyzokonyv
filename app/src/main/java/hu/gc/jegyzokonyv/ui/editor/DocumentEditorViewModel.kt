@@ -78,16 +78,6 @@ class DocumentEditorViewModel @Inject constructor(
         }
     }
 
-    fun onAddText(text: String) {
-        if (text.isBlank()) return
-        if (_html.value.contains("safety-walkthrough")) return
-        viewModelScope.launch {
-            flushEditorHtml()
-            draftRepository.appendTextBlock(draftId, text.trim())
-            markHtmlLoadedFromRepository(draftRepository.loadHtml(draftId))
-        }
-    }
-
     fun onDocumentHtmlChanged(html: String) {
         if (html.isBlank()) return
         _html.value = html

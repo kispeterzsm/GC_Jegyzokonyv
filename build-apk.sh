@@ -16,6 +16,9 @@ esac
 # Gradle 8.9 supports JDK 8–22. Pick a compatible JVM, preferring 21 → 17 → 11.
 if [[ -z "${JAVA_HOME:-}" ]] || ! "${JAVA_HOME}/bin/java" -version 2>&1 | grep -qE 'version "(1\.8|11|17|21)'; then
     for candidate in \
+        "$HOME/.local/share/jdks/java-21-openjdk" \
+        "$HOME/.local/share/jdks/java-17-openjdk" \
+        "$HOME/.local/share/jdks/java-11-openjdk" \
         /usr/lib/jvm/java-21-openjdk \
         /usr/lib/jvm/java-17-openjdk \
         /usr/lib/jvm/java-11-openjdk \
