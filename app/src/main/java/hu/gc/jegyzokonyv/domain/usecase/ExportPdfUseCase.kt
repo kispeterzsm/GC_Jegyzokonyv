@@ -803,8 +803,8 @@ class ExportPdfUseCase @Inject constructor(
         }
 
         private fun targetPixelSize(widthPt: Float, heightPt: Float, orientation: Int): ImageSize {
-            val displayWidth = (widthPt * IMAGE_DPI / POINTS_PER_INCH).roundToInt().coerceAtLeast(1)
-            val displayHeight = (heightPt * IMAGE_DPI / POINTS_PER_INCH).roundToInt().coerceAtLeast(1)
+            val displayWidth = (widthPt * PDF_IMAGE_DPI / POINTS_PER_INCH).roundToInt().coerceAtLeast(1)
+            val displayHeight = (heightPt * PDF_IMAGE_DPI / POINTS_PER_INCH).roundToInt().coerceAtLeast(1)
             return if (swapsAxes(orientation)) ImageSize(displayHeight, displayWidth) else ImageSize(displayWidth, displayHeight)
         }
 
@@ -1269,10 +1269,10 @@ class ExportPdfUseCase @Inject constructor(
         }
 
         private fun targetPixelSize(widthPt: Float, heightPt: Float, orientation: Int): ImageSize {
-            val displayWidth = (widthPt * IMAGE_DPI / POINTS_PER_INCH)
+            val displayWidth = (widthPt * PDF_IMAGE_DPI / POINTS_PER_INCH)
                 .roundToInt()
                 .coerceAtLeast(1)
-            val displayHeight = (heightPt * IMAGE_DPI / POINTS_PER_INCH)
+            val displayHeight = (heightPt * PDF_IMAGE_DPI / POINTS_PER_INCH)
                 .roundToInt()
                 .coerceAtLeast(1)
             return if (swapsAxes(orientation)) {
@@ -1553,7 +1553,9 @@ class ExportPdfUseCase @Inject constructor(
         const val PAGE_NUMBER_TOKEN = "{{oldalszam}}"
 
         const val POINTS_PER_INCH = 72f
-        const val IMAGE_DPI = 180f
+        // PdfDocument has no output compression setting, so image raster size is
+        // the main control over final PDF size.
+        const val PDF_IMAGE_DPI = 120f
         const val PAGE_WIDTH_PT = 595f
         const val PAGE_HEIGHT_PT = 842f
         const val PAGE_MARGIN_PT = 42f
