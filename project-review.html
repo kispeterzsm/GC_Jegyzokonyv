@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GC Jegyzokonyv Project Review</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1f2933;
+      --muted: #5d6978;
+      --line: #d8dee8;
+      --panel: #f7f9fc;
+      --good: #0f766e;
+      --warn: #b45309;
+      --bad: #b91c1c;
+      --info: #1d4ed8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      color: var(--ink);
+      background: #fff;
+    }
+    main {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 40px 28px 56px;
+    }
+    h1, h2, h3 { line-height: 1.2; margin: 0; }
+    h1 { font-size: 34px; margin-bottom: 8px; }
+    h2 { font-size: 22px; margin-top: 34px; padding-top: 18px; border-top: 1px solid var(--line); }
+    h3 { font-size: 17px; margin-top: 20px; }
+    p { margin: 8px 0 0; }
+    ul, ol { margin: 8px 0 0 22px; padding: 0; }
+    li { margin: 5px 0; }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 0.93em;
+      background: #eef2f7;
+      padding: 1px 4px;
+      border-radius: 4px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      border: 1px solid var(--line);
+    }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 10px 12px;
+      vertical-align: top;
+      text-align: left;
+    }
+    th { background: #eef2f7; font-weight: 650; }
+    tr:last-child td { border-bottom: 0; }
+    .meta {
+      color: var(--muted);
+      margin-bottom: 24px;
+    }
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin: 22px 0;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      background: var(--panel);
+    }
+    .card strong { display: block; font-size: 22px; margin-bottom: 2px; }
+    .status {
+      display: inline-block;
+      min-width: 72px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      text-align: center;
+      color: #fff;
+    }
+    .critical { background: var(--bad); }
+    .high { background: #c2410c; }
+    .medium { background: var(--warn); }
+    .low { background: var(--info); }
+    .positive { background: var(--good); }
+    .note {
+      border-left: 4px solid var(--info);
+      background: #eff6ff;
+      padding: 10px 12px;
+      margin-top: 12px;
+    }
+    .verdict {
+      border-left: 4px solid var(--warn);
+      background: #fff7ed;
+      padding: 12px 14px;
+      margin-top: 16px;
+    }
+    .small { color: var(--muted); font-size: 13px; }
+    @media (max-width: 760px) {
+      main { padding: 28px 16px 40px; }
+      .summary { grid-template-columns: 1fr 1fr; }
+      table { font-size: 13px; }
+      th, td { padding: 8px; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>GC Jegyzokonyv Project Review</h1>
+  <p class="meta">Reviewed on 2026-07-09 in <code>/home/wooly/Projects/GC_Jegyzokonyv</code>. App source was not changed.</p>
+
+  <section class="summary">
+    <div class="card"><strong>Build</strong><span class="status positive">Pass</span><p class="small"><code>./build-apk.sh debug</code> produced a 21 MB debug APK.</p></div>
+    <div class="card"><strong>Tests</strong><span class="status high">Missing</span><p class="small"><code>:app:testDebugUnitTest</code> is configured but has <code>NO-SOURCE</code>.</p></div>
+    <div class="card"><strong>Lint</strong><span class="status critical">Fail</span><p class="small">1 error, 67 warnings from <code>:app:lintDebug</code>.</p></div>
+    <div class="card"><strong>CI</strong><span class="status high">Missing</span><p class="small">No GitHub Actions or other automated gate found.</p></div>
+  </section>
+
+  <div class="verdict">
+    <strong>Overall verdict:</strong> the project is functional and uses a sensible modern Android stack, but it is not yet following best practice in the areas that matter most for maintainability and release safety. The largest gaps are missing automated tests, failing lint, debug-APK distribution/self-update, destructive database migration, and large untested rendering/editor modules.
+  </div>
+
+  <h2>What Was Checked</h2>
+  <ul>
+    <li>Repository structure, Gradle setup, README, local instructions, and release scripts.</li>
+    <li>Android manifest, permissions, FileProvider paths, WebView/editor bridge, camera, PDF export, Room persistence, repositories, ViewModels, and template handling.</li>
+    <li>Build and quality tasks: <code>./build-apk.sh debug</code>, <code>:app:testDebugUnitTest</code>, and <code>:app:lintDebug</code>.</li>
+  </ul>
+
+  <h2>Positive Findings</h2>
+  <ul>
+    <li>The app uses Kotlin, Jetpack Compose, Hilt, Room, CameraX, a Gradle version catalog, and the Gradle wrapper.</li>
+    <li>The debug build succeeds through the project script: <code>app/build/outputs/apk/debug/app-debug.apk</code>.</li>
+    <li>Storage is mostly app-private. There are no broad external-storage permissions.</li>
+    <li>File sharing uses <code>FileProvider</code> with narrow paths for drafts, exports, and updates.</li>
+    <li>The DOCX XML parser disables external entities, which is the right direction for XXE safety.</li>
+    <li>The WebView preview blocks network loads and performs canonical path checks for draft image access.</li>
+    <li>The PDF exporter downsamples images and recycles bitmaps, which reduces memory risk during export.</li>
+    <li>The domain/template codec and HTML rendering code contain pure logic that can be tested quickly on the JVM.</li>
+  </ul>
+
+  <h2>Highest Priority Findings</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Severity</th>
+        <th>Finding</th>
+        <th>Evidence</th>
+        <th>Recommendation</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="status critical">Critical</span></td>
+        <td>No useful automated test suite exists.</td>
+        <td>No <code>app/src/test</code> or <code>app/src/androidTest</code> sources. No test dependencies. <code>:app:testDebugUnitTest</code> returns <code>NO-SOURCE</code>.</td>
+        <td>Add JVM and Robolectric tests first, then gate PRs/releases on <code>testDebugUnitTest</code>, <code>lintDebug</code>, and <code>assembleDebug</code>.</td>
+      </tr>
+      <tr>
+        <td><span class="status critical">Critical</span></td>
+        <td>Lint currently fails.</td>
+        <td><code>EditorHtmlWebView.kt:71</code> reports <code>JavascriptInterface</code> error on <code>addJavascriptInterface</code>. Lint also reports 67 warnings.</td>
+        <td>Fix or intentionally suppress the bridge lint issue only after proving the bridge methods are visible and safe. Then make lint a required CI gate.</td>
+      </tr>
+      <tr>
+        <td><span class="status critical">Critical</span></td>
+        <td>Database upgrades can delete user data.</td>
+        <td><code>AppModule.kt:35-36</code> uses <code>fallbackToDestructiveMigration()</code>. <code>AppDatabase.kt:9</code> has <code>exportSchema = false</code>.</td>
+        <td>Export Room schemas, add explicit migrations, and add migration tests. This app stores field reports and templates, so destructive migration is not acceptable for real users.</td>
+      </tr>
+      <tr>
+        <td><span class="status high">High</span></td>
+        <td>The release/update model distributes a debug APK.</td>
+        <td><code>release-apk.sh</code> builds <code>app-debug.apk</code>, pushes it to GitHub Releases, and README links to <code>app-debug.apk</code>. Release minification is disabled in <code>app/build.gradle.kts:28</code>.</td>
+        <td>Ship a release-signed APK or app bundle, enable R8/resource shrinking where feasible, and keep debug APKs out of end-user release channels.</td>
+      </tr>
+      <tr>
+        <td><span class="status high">High</span></td>
+        <td>The self-update path increases security and policy risk.</td>
+        <td>Manifest requests <code>INTERNET</code> and <code>REQUEST_INSTALL_PACKAGES</code>. <code>AppUpdateManager.kt</code> fetches latest GitHub release and downloads <code>app-debug.apk</code>.</td>
+        <td>If self-update is required, use release signing, checksum/signature verification for downloaded assets, clear user messaging, and keep update code isolated. If not required, remove package-install permission and update flow.</td>
+      </tr>
+      <tr>
+        <td><span class="status high">High</span></td>
+        <td>Editable WebView has a broad attack surface.</td>
+        <td><code>EditorHtmlWebView.kt:61-71</code> enables JavaScript, file access, file access from file URLs, and a JS bridge. Template HTML blocks are inserted as HTML in <code>JsoupHtmlEngine.kt:303-307</code>.</td>
+        <td>Define a threat model for imported/user-authored HTML. Prefer sanitizing HTML blocks, disabling file URL access where possible, using a safer asset/content loader, and keeping the bridge API minimal and tested.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Other Important Findings</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Severity</th>
+        <th>Area</th>
+        <th>Observation</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="status medium">Medium</span></td>
+        <td>Maintainability</td>
+        <td><code>ExportPdfUseCase.kt</code> is 1,671 lines and owns parsing, layout, image decoding, safety-report rendering, file replacement, and cleanup.</td>
+        <td>Split into parser, native renderer, safety renderer, image utilities, and file writer. Add regression tests before refactoring behavior.</td>
+      </tr>
+      <tr>
+        <td><span class="status medium">Medium</span></td>
+        <td>Maintainability</td>
+        <td><code>TemplateEditorScreen.kt</code> is 1,763 lines and <code>TemplateEditorViewModel.kt</code> is 673 lines.</td>
+        <td>Extract smaller composables and pure table/block transformation functions. Test the transformations independently.</td>
+      </tr>
+      <tr>
+        <td><span class="status medium">Medium</span></td>
+        <td>Dependencies</td>
+        <td>Lint reports newer stable versions for AGP, Compose BOM, Lifecycle, Activity, Navigation, Room, CameraX, Core KTX, and Hilt Navigation Compose. Navigation lint checks are skipped because the library lint checks are obsolete for the current lint environment.</td>
+        <td>Do staged dependency upgrades and run build/lint/tests after each cluster. Upgrade Navigation early so its lint checks run again.</td>
+      </tr>
+      <tr>
+        <td><span class="status medium">Medium</span></td>
+        <td>Resource lifecycle</td>
+        <td><code>CameraCaptureScreen.kt:123</code> creates a single-thread executor without shutdown. <code>PdfPreviewScreen.kt</code> renders bitmaps and does not explicitly recycle them when the screen changes/disposes.</td>
+        <td>Add disposal hooks for camera executor and preview bitmaps, or use lifecycle-aware abstractions that own cleanup.</td>
+      </tr>
+      <tr>
+        <td><span class="status medium">Medium</span></td>
+        <td>Concurrency</td>
+        <td><code>DocumentEditorViewModel.kt:158-163</code> calls <code>runBlocking</code> in <code>onCleared()</code>.</td>
+        <td>Avoid blocking the main thread during teardown. Prefer explicit save-on-pause/on-stop flows and a repository API that can commit pending editor state before navigation/export.</td>
+      </tr>
+      <tr>
+        <td><span class="status medium">Medium</span></td>
+        <td>Dispatcher injection</td>
+        <td>Most data classes inject <code>@IoDispatcher</code>, but <code>ExportPdfUseCase.kt:23,54</code> directly uses <code>Dispatchers.IO</code>.</td>
+        <td>Inject dispatchers consistently. This improves deterministic testing and keeps threading policy centralized.</td>
+      </tr>
+      <tr>
+        <td><span class="status medium">Medium</span></td>
+        <td>Error handling</td>
+        <td>Some ViewModel operations launch repository/use-case calls without <code>runCatching</code> or user-visible error state, for example template creation/duplication and profile image import.</td>
+        <td>Make failure states explicit and user-visible. Add tests for missing files, invalid templates, invalid DOCX, and failed update/download paths.</td>
+      </tr>
+      <tr>
+        <td><span class="status medium">Medium</span></td>
+        <td>Privacy</td>
+        <td>Speech recognition logs recognized and partial text in <code>DocumentEditorScreen.kt:411-421</code>. Profile details, signatures, and stamp images are stored in app-private files/preferences but not encrypted.</td>
+        <td>Avoid logging dictated content. Decide whether signatures/stamps require encrypted storage or a documented privacy position.</td>
+      </tr>
+      <tr>
+        <td><span class="status low">Low</span></td>
+        <td>Docs/repo hygiene</td>
+        <td><code>AGENTS.md</code> says <code>build-pk.sh</code>, but the repo contains <code>build-apk.sh</code>. README says the Gradle wrapper jar is not shipped, but <code>gradle/wrapper/gradle-wrapper.jar</code> exists.</td>
+        <td>Correct the script name and README so new contributors and CI use the same documented path.</td>
+      </tr>
+      <tr>
+        <td><span class="status low">Low</span></td>
+        <td>Manifest/resources</td>
+        <td>Lint warns about deprecated backup config, obsolete <code>mipmap-anydpi-v26</code> qualifier for minSdk 26, unused resources, missing monochrome launcher icon, and platform <code>android.media.ExifInterface</code>.</td>
+        <td>Clean these up after the critical gates. Add <code>dataExtractionRules</code>, migrate to AndroidX ExifInterface, remove unused resources, and add monochrome icon assets.</td>
+      </tr>
+      <tr>
+        <td><span class="status low">Low</span></td>
+        <td>Product/docs consistency</td>
+        <td>README describes the app as offline and without internet, but the app requests Internet for GitHub update checks.</td>
+        <td>Either document updates as the one online feature or make update checking optional/removable.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Automated Testing Plan Without a Phone</h2>
+  <p>The app can get meaningful automated coverage without a physical phone. Start with host-side JVM and Robolectric tests, then optionally add emulator tests later for camera/WebView behavior that needs the real platform.</p>
+
+  <h3>1. Add a host-side unit test baseline</h3>
+  <ul>
+    <li>Create <code>app/src/test/java/hu/gc/jegyzokonyv/...</code>.</li>
+    <li>Add dependencies for JUnit or Kotlin test, Truth/Kotest assertions, <code>kotlinx-coroutines-test</code>, Turbine for Flow testing, Robolectric, AndroidX Test Core, and Room testing.</li>
+    <li>Add <code>testOptions.unitTests.isIncludeAndroidResources = true</code> for Robolectric/resource-aware tests.</li>
+  </ul>
+
+  <h3>2. Prioritize pure JVM tests</h3>
+  <ul>
+    <li><code>TemplateContentCodec</code>: round-trip all block types, clamp invalid row/column counts, preserve style settings, tolerate missing/unknown JSON fields.</li>
+    <li><code>JsoupHtmlEngine</code>: token replacement, HTML escaping, editable table attributes, image-page append behavior, captions, page-number and image-index tokens.</li>
+    <li><code>DocxTemplateConverter</code>: minimal DOCX paragraph/table import, headers/footers, page breaks, image placeholders, malformed DOCX handling, and XML external entity rejection.</li>
+    <li>Use cases: save, duplicate, delete, and create draft behavior with fake repositories.</li>
+    <li>Template editor transformations: row/column insert/delete, tick columns, locked image block behavior, read-only behavior, and preview HTML value extraction.</li>
+  </ul>
+
+  <h3>3. Add Robolectric tests for Android-dependent logic</h3>
+  <ul>
+    <li>Room repositories with an in-memory database and temporary app-private files.</li>
+    <li>Migration tests once destructive migration is removed.</li>
+    <li>ViewModel state and event tests using fake repositories and <code>kotlinx-coroutines-test</code>.</li>
+    <li>Profile image import/edit behavior with small generated bitmaps.</li>
+    <li>PDF export smoke tests from fixed HTML and images: assert file exists, page count is expected, missing images are represented, and safety template rejects missing profile data.</li>
+  </ul>
+
+  <h3>4. Add visual regression tests that still avoid phones</h3>
+  <ul>
+    <li>Use Paparazzi or Roborazzi for Compose screenshot tests of Home, Template Picker, Settings/Profile, Editor toolbar states, and error dialogs.</li>
+    <li>Add PDF golden tests for representative documents. Render generated PDFs to images in CI using a deterministic renderer and compare against approved baselines with a small pixel tolerance.</li>
+  </ul>
+
+  <h3>5. Make a single automated gate</h3>
+  <p>Add a CI workflow or local script equivalent to:</p>
+  <pre><code>./build-apk.sh debug
+JAVA_HOME=/path/to/jdk ANDROID_HOME=/path/to/sdk ./gradlew :app:testDebugUnitTest :app:lintDebug</code></pre>
+  <p>Once tests exist and lint is fixed, CI should fail on any test, lint, or build regression. This gives you automatic coverage without requiring a physical Android phone.</p>
+
+  <h2>Suggested Implementation Order</h2>
+  <ol>
+    <li>Fix lint failure and commit a clean baseline for <code>:app:lintDebug</code>.</li>
+    <li>Add basic JVM test dependencies and the first tests for <code>TemplateContentCodec</code>, <code>JsoupHtmlEngine</code>, and <code>DocxTemplateConverter</code>.</li>
+    <li>Remove destructive Room migration by exporting schemas and adding migrations/tests.</li>
+    <li>Refactor the PDF exporter behind tests, starting with parser/renderer/image utility separation.</li>
+    <li>Replace debug-APK release distribution with a release-signed path and review the self-update feature.</li>
+    <li>Add CI so every push runs build, tests, and lint.</li>
+  </ol>
+
+  <h2>Command Results</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Command</th>
+        <th>Result</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>./build-apk.sh debug</code></td>
+        <td><span class="status positive">Pass</span></td>
+        <td>Generated <code>app/build/outputs/apk/debug/app-debug.apk</code>, 21 MB.</td>
+      </tr>
+      <tr>
+        <td><code>./gradlew :app:testDebugUnitTest</code></td>
+        <td><span class="status high">No source</span></td>
+        <td>Direct Gradle failed until <code>JAVA_HOME</code>/<code>ANDROID_HOME</code> were set. With those set, the task succeeded but had no tests.</td>
+      </tr>
+      <tr>
+        <td><code>./gradlew :app:lintDebug</code></td>
+        <td><span class="status critical">Fail</span></td>
+        <td>1 error and 67 warnings. HTML lint report: <code>app/build/reports/lint-results-debug.html</code>.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="small">End of report.</p>
+</main>
+</body>
+</html>
