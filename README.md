@@ -37,4 +37,27 @@ Run the local quality gate without a phone:
 ```sh
 ./build-pk.sh debug
 ./gradlew :app:testDebugUnitTest :app:lintDebug
+./gradlew :app:verifyRoborazziDebug
+./scripts/verify-pdf-goldens.sh
+```
+
+Compose screenshot baselines live under `app/src/test/snapshots`. Re-record
+them after an intentional UI layout change with:
+
+```sh
+./gradlew :app:recordRoborazziDebug
+```
+
+With an emulator running, execute the real Android PDF renderer smoke test:
+
+```sh
+./gradlew :app:connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=hu.gc.jegyzokonyv.domain.usecase.ExportPdfUseCaseInstrumentedTest
+```
+
+PDF golden baselines live under `testdata/pdf/golden`. Re-record them after an
+intentional PDF layout change with:
+
+```sh
+./scripts/verify-pdf-goldens.sh --record
 ```

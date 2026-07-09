@@ -107,27 +107,11 @@ fun TemplateEditorScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(titleRes)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.action_back),
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = { viewModel.save(fallbackName, onSaved) },
-                        enabled = canSave,
-                    ) {
-                        Icon(
-                            Icons.Filled.Check,
-                            contentDescription = stringResource(R.string.action_save),
-                        )
-                    }
-                },
+            TemplateEditorTopBar(
+                title = stringResource(titleRes),
+                canSave = canSave,
+                onBack = onBack,
+                onSave = { viewModel.save(fallbackName, onSaved) },
             )
         },
     ) { padding ->
@@ -303,6 +287,38 @@ fun TemplateEditorScreen(
             },
         )
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun TemplateEditorTopBar(
+    title: String,
+    canSave: Boolean,
+    onBack: () -> Unit,
+    onSave: () -> Unit,
+) {
+    TopAppBar(
+        title = { Text(title) },
+        navigationIcon = {
+            IconButton(onClick = onBack) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(R.string.action_back),
+                )
+            }
+        },
+        actions = {
+            IconButton(
+                onClick = onSave,
+                enabled = canSave,
+            ) {
+                Icon(
+                    Icons.Filled.Check,
+                    contentDescription = stringResource(R.string.action_save),
+                )
+            }
+        },
+    )
 }
 
 @Composable
