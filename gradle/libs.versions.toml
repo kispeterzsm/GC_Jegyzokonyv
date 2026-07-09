@@ -14,6 +14,14 @@ cameraX = "1.3.4"
 coil = "2.7.0"
 jsoup = "1.18.1"
 coroutines = "1.8.1"
+junit = "4.13.2"
+truth = "1.4.4"
+turbine = "1.1.0"
+robolectric = "4.13"
+androidxTest = "1.6.1"
+androidxTestExt = "1.2.1"
+androidxArchCore = "2.2.0"
+pdfbox = "2.0.31"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -49,6 +57,18 @@ coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coi
 jsoup = { group = "org.jsoup", name = "jsoup", version.ref = "jsoup" }
 
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+kotlin-test-junit = { group = "org.jetbrains.kotlin", name = "kotlin-test-junit", version.ref = "kotlin" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+truth = { group = "com.google.truth", name = "truth", version.ref = "truth" }
+turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
+robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
+androidx-test-core = { group = "androidx.test", name = "core-ktx", version.ref = "androidxTest" }
+androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTest" }
+androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit-ktx", version.ref = "androidxTestExt" }
+androidx-arch-core-testing = { group = "androidx.arch.core", name = "core-testing", version.ref = "androidxArchCore" }
+androidx-room-testing = { group = "androidx.room", name = "room-testing", version.ref = "room" }
+pdfbox = { group = "org.apache.pdfbox", name = "pdfbox", version.ref = "pdfbox" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

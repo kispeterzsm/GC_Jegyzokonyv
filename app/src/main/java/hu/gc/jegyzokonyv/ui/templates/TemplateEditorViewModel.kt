@@ -123,88 +123,57 @@ class TemplateEditorViewModel @Inject constructor(
     }
 
     fun onTableCellTextChange(id: String, row: Int, column: Int, text: String) = updateTable(id) { table ->
-        table.copy(cells = table.normalizedCells().mapIndexed { rowIndex, values ->
-            if (rowIndex == row) values.mapIndexed { columnIndex, value -> if (columnIndex == column) text else value } else values
-        })
+        TemplateTableTransforms.updateCellText(table, row, column, text)
     }
 
     fun onTableRowSettingsChange(id: String, row: Int, settings: TableAxisSettings) = updateTable(id) { table ->
-        table.applyRowSettings(row, settings)
+        TemplateTableTransforms.applyRowSettings(table, row, settings)
     }
 
     fun onTableColumnSettingsChange(id: String, column: Int, settings: TableAxisSettings) = updateTable(id) { table ->
-        table.applyColumnSettings(column, settings)
+        TemplateTableTransforms.applyColumnSettings(table, column, settings)
     }
 
     fun onTableCellSettingsChange(id: String, row: Int, column: Int, settings: TableCellSettings) = updateTable(id) { table ->
-        table.copy(cellSettings = table.normalizedCellSettings().mapIndexed { rowIndex, values ->
-            if (rowIndex == row) values.mapIndexed { columnIndex, value -> if (columnIndex == column) settings else value } else values
-        })
+        TemplateTableTransforms.updateCellSettings(table, row, column, settings)
     }
 
     fun insertTableRowBelow(id: String, row: Int) = updateTable(id) { table ->
-        if (table.rows >= 50) return@updateTable table
-        val insertAt = (row + 1).coerceIn(0, table.rows.coerceIn(1, 50))
-        val columns = table.columns.coerceIn(1, 20)
-        table.copy(
-            rows = table.rows + 1,
-            cells = table.normalizedCells().toMutableList().apply { add(insertAt, List(columns) { "" }) },
-            rowSettings = table.normalizedRowSettings().toMutableList().apply { add(insertAt, TableAxisSettings()) },
-            cellSettings = table.normalizedCellSettings().toMutableList().apply { add(insertAt, List(columns) { TableCellSettings() }) },
-        )
+        TemplateTableTransforms.insertRowBelow(table, row)
     }
 
     fun insertTableColumnRight(id: String, column: Int) = updateTable(id) { table ->
-        if (table.columns >= 20) return@updateTable table
-        val rows = table.rows.coerceIn(1, 50)
-        val insertAt = (column + 1).coerceIn(0, table.columns.coerceIn(1, 20))
-        table.copy(
-            columns = table.columns + 1,
-            cells = table.normalizedCells().map { row -> row.toMutableList().apply { add(insertAt, "") } },
-            columnSettings = table.normalizedColumnSettings().toMutableList().apply { add(insertAt, TableAxisSettings()) },
-            cellSettings = table.normalizedCellSettings().map { row -> row.toMutableList().apply { add(insertAt, TableCellSettings()) } }.take(rows),
-        )
+        TemplateTableTransforms.insertColumnRight(table, column)
     }
 
     fun deleteTableRow(id: String, row: Int) = updateTable(id) { table ->
-        if (table.rows <= 1) return@updateTable table
-        val removeAt = row.coerceIn(0, table.rows - 1)
-        table.copy(
-            rows = table.rows - 1,
-            cells = table.normalizedCells().filterIndexed { index, _ -> index != removeAt },
-            rowSettings = table.normalizedRowSettings().filterIndexed { index, _ -> index != removeAt },
-            cellSettings = table.normalizedCellSettings().filterIndexed { index, _ -> index != removeAt },
-        )
+        TemplateTableTransforms.deleteRow(table, row)
     }
 
     fun deleteTableColumn(id: String, column: Int) = updateTable(id) { table ->
-        deleteTableColumnTransform(table, column)
+        TemplateTableTransforms.deleteColumn(table, column)
     }
 
     fun onNestedTableCellTextChange(containerId: String, tableId: String, row: Int, column: Int, text: String) = updateNestedTable(containerId, tableId) { table ->
-        table.copy(cells = table.normalizedCells().mapIndexed { rowIndex, values ->
-            if (rowIndex == row) values.mapIndexed { columnIndex, value -> if (columnIndex == column) text else value } else values
-        })
+        TemplateTableTransforms.updateCellText(table, row, column, text)
     }
 
     fun onNestedTableRowSettingsChange(containerId: String, tableId: String, row: Int, settings: TableAxisSettings) = updateNestedTable(containerId, tableId) { table ->
-        table.applyRowSettings(row, settings)
+        TemplateTableTransforms.applyRowSettings(table, row, settings)
     }
 
     fun onNestedTableColumnSettingsChange(containerId: String, tableId: String, column: Int, settings: TableAxisSettings) = updateNestedTable(containerId, tableId) { table ->
-        table.applyColumnSettings(column, settings)
+        TemplateTableTransforms.applyColumnSettings(table, column, settings)
     }
 
     fun onNestedTableCellSettingsChange(containerId: String, tableId: String, row: Int, column: Int, settings: TableCellSettings) = updateNestedTable(containerId, tableId) { table ->
-        table.copy(cellSettings = table.normalizedCellSettings().mapIndexed { rowIndex, values ->
-            if (rowIndex == row) values.mapIndexed { columnIndex, value -> if (columnIndex == column) settings else value } else values
-        })
+        TemplateTableTransforms.updateCellSettings(table, row, column, settings)
     }
 
-    fun insertNestedTableRowBelow(containerId: String, tableId: String, row: Int) = updateNestedTable(containerId, tableId) { table -> insertTableRowBelowTransform(table, row) }
-    fun insertNestedTableColumnRight(containerId: String, tableId: String, column: Int) = updateNestedTable(containerId, tableId) { table -> insertTableColumnRightTransform(table, column) }
-    fun deleteNestedTableRow(containerId: String, tableId: String, row: Int) = updateNestedTable(containerId, tableId) { table -> deleteTableRowTransform(table, row) }
-    fun deleteNestedTableColumn(containerId: String, tableId: String, column: Int) = updateNestedTable(containerId, tableId) { table -> deleteTableColumnTransform(table, column) }
+    fun insertNestedTableRowBelow(containerId: String, tableId: String, row: Int) = updateNestedTable(containerId, tableId) { table -> TemplateTableTransforms.insertRowBelow(table, row) }
+    fun insertNestedTableColumnRight(containerId: String, tableId: String, column: Int) = updateNestedTable(containerId, tableId) { table -> TemplateTableTransforms.insertColumnRight(table, column) }
+    fun deleteNestedTableRow(containerId: String, tableId: String, row: Int) = updateNestedTable(containerId, tableId) { table -> TemplateTableTransforms.deleteRow(table, row) }
+    fun deleteNestedTableColumn(containerId: String, tableId: String, column: Int) = updateNestedTable(containerId, tableId) { table -> TemplateTableTransforms.deleteColumn(table, column) }
 
     fun addTextBlock() {
         if (_state.value.isReadOnly) return
@@ -439,102 +408,6 @@ class TemplateEditorViewModel @Inject constructor(
             })
         }
     }
-
-    private fun insertTableRowBelowTransform(table: TemplateBlock.Table, row: Int): TemplateBlock.Table {
-        if (table.rows >= 50) return table
-        val insertAt = (row + 1).coerceIn(0, table.rows.coerceIn(1, 50))
-        val columns = table.columns.coerceIn(1, 20)
-        return table.copy(
-            rows = table.rows + 1,
-            cells = table.normalizedCells().toMutableList().apply { add(insertAt, List(columns) { "" }) },
-            rowSettings = table.normalizedRowSettings().toMutableList().apply { add(insertAt, TableAxisSettings()) },
-            cellSettings = table.normalizedCellSettings().toMutableList().apply { add(insertAt, List(columns) { TableCellSettings() }) },
-        )
-    }
-
-    private fun insertTableColumnRightTransform(table: TemplateBlock.Table, column: Int): TemplateBlock.Table {
-        if (table.columns >= 20) return table
-        val rows = table.rows.coerceIn(1, 50)
-        val insertAt = (column + 1).coerceIn(0, table.columns.coerceIn(1, 20))
-        return table.copy(
-            columns = table.columns + 1,
-            cells = table.normalizedCells().map { row -> row.toMutableList().apply { add(insertAt, "") } },
-            columnSettings = table.normalizedColumnSettings().toMutableList().apply { add(insertAt, TableAxisSettings()) },
-            cellSettings = table.normalizedCellSettings().map { row -> row.toMutableList().apply { add(insertAt, TableCellSettings()) } }.take(rows),
-        )
-    }
-
-    private fun deleteTableRowTransform(table: TemplateBlock.Table, row: Int): TemplateBlock.Table {
-        if (table.rows <= 1) return table
-        val removeAt = row.coerceIn(0, table.rows - 1)
-        return table.copy(
-            rows = table.rows - 1,
-            cells = table.normalizedCells().filterIndexed { index, _ -> index != removeAt },
-            rowSettings = table.normalizedRowSettings().filterIndexed { index, _ -> index != removeAt },
-            cellSettings = table.normalizedCellSettings().filterIndexed { index, _ -> index != removeAt },
-        )
-    }
-
-    private fun deleteTableColumnTransform(table: TemplateBlock.Table, column: Int): TemplateBlock.Table {
-        if (table.columns <= 1) return table
-        val removeAt = column.coerceIn(0, table.columns - 1)
-        val hasTickCells = table.normalizedCellSettings().any { row -> row.getOrNull(removeAt)?.toggleCheck == true }
-        if (hasTickCells) return table
-        return table.copy(
-            columns = table.columns - 1,
-            cells = table.normalizedCells().map { row -> row.filterIndexed { index, _ -> index != removeAt } },
-            columnSettings = table.normalizedColumnSettings().filterIndexed { index, _ -> index != removeAt },
-            cellSettings = table.normalizedCellSettings().map { row -> row.filterIndexed { index, _ -> index != removeAt } },
-        )
-    }
-
-    private fun TemplateBlock.Table.normalizedCells(): List<List<String>> =
-        List(rows.coerceIn(1, 50)) { row -> List(columns.coerceIn(1, 20)) { column -> cells.getOrNull(row)?.getOrNull(column).orEmpty() } }
-
-    private fun TemplateBlock.Table.normalizedRowSettings(): List<TableAxisSettings> =
-        List(rows.coerceIn(1, 50)) { row -> rowSettings.getOrNull(row) ?: TableAxisSettings() }
-
-    private fun TemplateBlock.Table.normalizedColumnSettings(): List<TableAxisSettings> =
-        List(columns.coerceIn(1, 20)) { column -> columnSettings.getOrNull(column) ?: TableAxisSettings() }
-
-    private fun TemplateBlock.Table.normalizedCellSettings(): List<List<TableCellSettings>> =
-        List(rows.coerceIn(1, 50)) { row -> List(columns.coerceIn(1, 20)) { column -> cellSettings.getOrNull(row)?.getOrNull(column) ?: TableCellSettings() } }
-
-    private fun TemplateBlock.Table.applyRowSettings(row: Int, settings: TableAxisSettings): TemplateBlock.Table {
-        val safeRow = row.coerceIn(0, rows.coerceIn(1, 50) - 1)
-        val safeSettings = if (settings.headerRow) settings.copy(hideIfEmpty = false) else settings
-        return copy(
-            rowSettings = normalizedRowSettings().mapIndexed { index, value -> if (index == safeRow) safeSettings else value },
-            cellSettings = normalizedCellSettings().mapIndexed { rowIndex, values ->
-                if (rowIndex == safeRow) values.map { it.withAxisSettings(safeSettings) } else values
-            },
-        )
-    }
-
-    private fun TemplateBlock.Table.applyColumnSettings(column: Int, settings: TableAxisSettings): TemplateBlock.Table {
-        val safeColumn = column.coerceIn(0, columns.coerceIn(1, 20) - 1)
-        return copy(
-            columnSettings = normalizedColumnSettings().mapIndexed { index, value -> if (index == safeColumn) settings else value },
-            cellSettings = normalizedCellSettings().mapIndexed { rowIndex, values ->
-                val isHeaderRow = rowSettings.getOrNull(rowIndex)?.headerRow == true
-                values.mapIndexed { columnIndex, value ->
-                    if (columnIndex == safeColumn) value.withAxisSettings(settings, keepVisible = isHeaderRow) else value
-                }
-            },
-        )
-    }
-
-    private fun TableCellSettings.withAxisSettings(settings: TableAxisSettings, keepVisible: Boolean = false): TableCellSettings = copy(
-        backgroundColor = settings.backgroundColor,
-        textColor = settings.textColor,
-        textAlign = settings.textAlign,
-        tickXBackgroundColor = settings.tickXBackgroundColor,
-        tickXTextColor = settings.tickXTextColor,
-        tickCheckedBackgroundColor = settings.tickCheckedBackgroundColor,
-        tickCheckedTextColor = settings.tickCheckedTextColor,
-        editable = settings.editable,
-        hideIfEmpty = settings.hideIfEmpty && !settings.headerRow && !keepVisible,
-    )
 
     private fun moveBlock(id: String, offset: Int) {
         if (_state.value.isReadOnly) return

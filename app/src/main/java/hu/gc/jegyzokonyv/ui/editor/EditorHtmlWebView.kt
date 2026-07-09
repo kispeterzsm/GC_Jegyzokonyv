@@ -1,5 +1,6 @@
 package hu.gc.jegyzokonyv.ui.editor
 
+import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -26,6 +27,7 @@ import org.json.JSONObject
 import java.io.File
 import java.io.FileInputStream
 
+@SuppressLint("JavascriptInterface")
 @Composable
 fun EditorHtmlWebView(
     html: String,
